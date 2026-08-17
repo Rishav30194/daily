@@ -4,6 +4,7 @@ import {
   addDays,
   diffDays,
   daysInMonth,
+  isSunday,
   isWeekend,
   isWithinEditWindow,
   monthDates,
@@ -12,6 +13,7 @@ import {
   toISO,
   weekKey,
   weekRange,
+  weekStart,
 } from './dates';
 
 describe('addDays', () => {
@@ -134,6 +136,33 @@ describe('weekKey', () => {
   test('every day of one week shares a key', () => {
     const keys = rangeDates('2026-08-17', '2026-08-23').map(weekKey);
     expect(new Set(keys).size).toBe(1);
+  });
+});
+
+describe('weekStart', () => {
+  test('returns the Monday of the week', () => {
+    expect(weekStart('2026-W34')).toBe('2026-08-17');
+    expect(weekStart('2026-W01')).toBe('2025-12-29');
+  });
+
+  test('round-trips with weekKey across the year boundary', () => {
+    // 2026-W53 is a real week, and it starts in December of the calendar year before
+    // the dates it mostly contains.
+    expect(weekStart('2026-W53')).toBe('2026-12-28');
+    expect(weekKey(weekStart('2026-W53'))).toBe('2026-W53');
+    expect(weekKey(weekStart('2025-W01'))).toBe('2025-W01');
+  });
+
+  test('rejects a string that is not a week key', () => {
+    expect(() => weekStart('2026-08')).toThrow();
+  });
+});
+
+describe('isSunday', () => {
+  test('only Sunday', () => {
+    expect(isSunday('2026-08-23')).toBe(true);
+    expect(isSunday('2026-08-22')).toBe(false); // Saturday is still a weekend day
+    expect(isSunday('2026-08-17')).toBe(false);
   });
 });
 
