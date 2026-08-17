@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fafaf9" />
+
+    <!-- iOS does not read all icon sizes from the manifest. Without this the home-screen
+         icon is a screenshot of the page. The href must include the base path — a bare
+         /apple-touch-icon.png resolves to the domain root and 404s on a project site. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/daily/apple-touch-icon.png" />
+
+    <title>Daily</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
