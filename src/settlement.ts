@@ -1,5 +1,5 @@
 import { settle } from './carry';
-import { addDays, diffDays } from './dates';
+import { addDays, diffDays, todayISO } from './dates';
 import { getMeta, getRange, saveMeta, writeDayRaw } from './storage';
 import type { ISODate } from './types';
 
@@ -29,11 +29,19 @@ export const FIRST_RUN_LOOKBACK = 14;
  * that can be gamed (SPEC.md §4).
  */
 export function settleFrom(from: ISODate, today: ISODate, now = new Date()): number {
-  const changed = settle(getRange(from, today), today, now);
+  // Clamped to the real calendar day, never the caller's word for it. Settlement
+  // expires every carry due before the date it is given, so a `today` in the future
+  // marks live carries as missed — and expiry has no undo. A caller passing the
+  // app's focused date, which follows whatever heatmap cell was last tapped, is the
+  // exact bug this guard exists for.
+  const real = todayISO(now);
+  const limit = today > real ? real : today;
+
+  const changed = settle(getRange(from, limit), limit, now);
   for (const entry of changed) writeDayRaw(entry);
 
   const meta = getMeta();
-  saveMeta({ ...meta, lastSettledOn: today });
+  saveMeta({ ...meta, lastSettledOn: limit });
   return changed.length;
 }
 

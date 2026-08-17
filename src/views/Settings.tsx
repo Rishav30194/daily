@@ -116,26 +116,34 @@ export function Settings({ onBack }: SettingsProps) {
     // carries are older than settlement's 14-day floor will ever reach again.
     const oldest = pending.preview.oldestDay;
 
-    // A restored backup can hold carries that fell due months ago. Without this they
-    // would sit as passes for ever and "expiry is automatic and retroactive" would
-    // quietly stop being true.
-    const settleImported = () => {
-      if (oldest) settleFrom(oldest, today);
-    };
-
+    let imported: ImportResult | null = null;
     try {
-      const result = importAll(pending.json);
-      settleImported();
-
-      setPending(null);
-      setMessage(`Imported. ${summarise(result)}.`);
+      imported = importAll(pending.json);
     } catch (err) {
-      try {
-        settleImported();
-      } catch {
-        // Storage is refusing writes; the message below is the useful half.
-      }
       onWriteError(err);
+    }
+
+    // Settled in its own step, whatever happened above. A restored backup can hold
+    // carries that fell due months ago; without this they sit as passes for ever and
+    // "expiry is automatic and retroactive" quietly stops being true. It runs even
+    // after a failed merge, because the days written before the failure are just as
+    // far out of settlement's 14-day reach.
+    if (oldest) {
+      try {
+        settleFrom(oldest, today);
+      } catch (err) {
+        // Reported only if the merge itself did not already report something — one
+        // storage message is the useful amount.
+        if (imported) onWriteError(err);
+      }
+    }
+
+    // A merge that landed is reported as landed, even if settlement then failed. The
+    // restore is the thing the user is anxious about; leaving the confirmation card
+    // up with stale counts reads as "nothing happened".
+    if (imported) {
+      setPending(null);
+      setMessage(`Imported. ${summarise(imported)}.`);
     }
   }
 
