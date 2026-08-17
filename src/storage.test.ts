@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest';
 
+import { gradeDay } from './grading';
 import {
   StorageFullError,
   exportAll,
@@ -389,6 +390,140 @@ describe('import trusts the key, not the record', () => {
     });
 
     expect(importAll(doc, true).oldestDay).toBe('2025-03-04');
+  });
+});
+
+describe('reviews are keyed by their key, not their contents', () => {
+  test('a record whose inner week disagrees with its key is filed under the key', () => {
+    // `weekStart` throws on anything that is not 'YYYY-Www', and the review history
+    // renders every stored week — so one bad value crashes the Sunday screen.
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {},
+      reviews: { '2026-W33': { week: 'nonsense', change: 'x', updatedAt: NOW.toISOString() } },
+    });
+
+    importAll(doc);
+    expect(getReview('2026-W33')?.week).toBe('2026-W33');
+  });
+
+  test('a key that is not a week is skipped', () => {
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {},
+      reviews: {
+        nonsense: { change: 'x', updatedAt: NOW.toISOString() },
+        '2026-W99': { change: 'x', updatedAt: NOW.toISOString() },
+        // 2025 has 52 weeks, so W53 is not a week that year — it resolves to
+        // 2026-W01 and would sit in the history as a duplicate of it.
+        '2025-W53': { change: 'x', updatedAt: NOW.toISOString() },
+        '': { change: 'x', updatedAt: NOW.toISOString() },
+      },
+    });
+
+    expect(importAll(doc)).toMatchObject({ added: 0, skipped: 4 });
+    expect(getAllReviews()).toEqual([]);
+  });
+
+  test('a year that really has 53 weeks keeps its last one', () => {
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {},
+      reviews: { '2026-W53': { change: 'real', updatedAt: NOW.toISOString() } },
+    });
+
+    expect(importAll(doc)).toMatchObject({ added: 1, skipped: 0 });
+    expect(getReview('2026-W53')?.change).toBe('real');
+  });
+
+  test('a week key stored before the check existed is not returned', () => {
+    localStorage.setItem(
+      'daily:v1:review:nonsense',
+      JSON.stringify({ week: 'nonsense', change: 'x', updatedAt: NOW.toISOString() }),
+    );
+    saveReview('2026-W33', { week: '2026-W33', change: 'real', updatedAt: '' }, NOW);
+
+    expect(getAllReviews().map((r) => r.week)).toEqual(['2026-W33']);
+  });
+});
+
+describe('dueOn is a date or it is nothing', () => {
+  test('a carry with a corrupt dueOn reads as lapsed, never as a pass', () => {
+    // The date is fed to parseISO and diffDays, both of which throw, so it has to go.
+    // But dropping it alone would leave `carried` with no due date — which `settle`
+    // skips and `itemPasses` counts as a pass, so the day would stay green for ever.
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried', dueOn: 'tomorrow' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'expired' });
+    expect(gradeDay(getDay('2026-08-17'))).not.toBe('green');
+  });
+
+  test('the same is true when dueOn is missing entirely', () => {
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding.status).toBe('expired');
+  });
+
+  test('a real dueOn survives', () => {
+    writeDayRaw(entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-08-18' } }));
+    expect(getDay('2026-08-17')?.coding.dueOn).toBe('2026-08-18');
+  });
+
+  test('an impossible date is dropped', () => {
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-02-30' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding.dueOn).toBeUndefined();
+  });
+
+  test('a done item keeps its shape when dueOn is corrupt', () => {
+    // Only `carried` is coerced. A completed carry is already a pass on its merits.
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'done', dueOn: 'tomorrow' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'done' });
+  });
+});
+
+describe('meta survives corruption', () => {
+  test('an unreadable lastSettledOn reads as never settled', () => {
+    // Settlement feeds it to diffDays during App's render; a throw there is a blank
+    // page on every launch.
+    localStorage.setItem(
+      'daily:v1:meta',
+      JSON.stringify({ schema: 1, lastSettledOn: 'nonsense', lastExportAt: null }),
+    );
+
+    expect(getMeta().lastSettledOn).toBeNull();
+  });
+
+  test('a real lastSettledOn survives', () => {
+    saveMeta({ schema: 1, lastSettledOn: '2026-08-17', lastExportAt: null });
+    expect(getMeta().lastSettledOn).toBe('2026-08-17');
+  });
+});
+
+describe('export leaves corrupt keys behind', () => {
+  test('a day key that is not a date is not copied into the backup', () => {
+    // Otherwise every future restore reports an unexplained permanent "1 skipped".
+    localStorage.setItem('daily:v1:day:nonsense', JSON.stringify(entry('nonsense')));
+    saveDay('2026-08-17', entry('2026-08-17'), NOW);
+
+    const doc = JSON.parse(exportAll(NOW));
+    expect(Object.keys(doc.days)).toEqual(['2026-08-17']);
   });
 });
 

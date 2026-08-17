@@ -1,4 +1,4 @@
-import { monthDates, rangeDates, toISO } from './dates';
+import { monthDates, rangeDates, toISO, weekKey, weekStart } from './dates';
 import type {
   DayEntry,
   ISODate,
@@ -94,7 +94,21 @@ function itemState(v: unknown): { status: DayEntry['coding']['status']; dueOn?: 
   if (!isObject(v)) return { status: 'pending' };
 
   const status = statuses.find((s) => s === v['status']) ?? 'pending';
-  const dueOn = typeof v['dueOn'] === 'string' ? v['dueOn'] : undefined;
+
+  // Only a real date survives. `dueOn` is read back by `parseISO` and `diffDays`,
+  // both of which throw on anything else — in settlement during startup, and in the
+  // carried line on Today. A corrupt value has to be dropped at the boundary, not
+  // met halfway through a render.
+  const raw = v['dueOn'];
+  const dueOn = typeof raw === 'string' && isISODate(raw) ? raw : undefined;
+
+  // A carry with no readable due date cannot expire: `settle` skips it, and
+  // `itemPasses` counts `carried` as a pass — so dropping the date alone would leave
+  // the day green for ever and hold a slot in the rolling window permanently.
+  // Reading it as lapsed keeps both invariants: it is not a pass, and the carry it
+  // records still counts. Never silently a pass.
+  if (status === 'carried' && dueOn === undefined) return { status: 'expired' };
+
   return dueOn === undefined ? { status } : { status, dueOn };
 }
 
@@ -146,7 +160,10 @@ function parseDay(v: unknown, date: ISODate): DayEntry | null {
 function parseReview(v: unknown, week: ISOWeek): WeeklyReview | null {
   if (!isObject(v)) return null;
   return {
-    week: typeof v['week'] === 'string' ? v['week'] : week,
+    // The key wins, as it does for days. `weekStart` throws on anything that is not
+    // 'YYYY-Www', and the review list renders every stored week — so one bad value
+    // taken from a record would crash the view the app opens on every Sunday.
+    week,
     change: typeof v['change'] === 'string' ? v['change'] : '',
     updatedAt: typeof v['updatedAt'] === 'string' ? v['updatedAt'] : new Date(0).toISOString(),
   };
@@ -207,7 +224,11 @@ export function saveReview(week: ISOWeek, review: WeeklyReview, now: Date = new 
 /** Every stored review, newest week first. */
 export function getAllReviews(): WeeklyReview[] {
   return keysWithPrefix(REVIEW)
-    .map((k) => getReview(k.slice(REVIEW.length)))
+    .map((k) => k.slice(REVIEW.length))
+    // Filtered here as well as on import, because a key written before that check
+    // existed would otherwise still reach `weekStart` and throw mid-render.
+    .filter(isISOWeek)
+    .map(getReview)
     .filter((r): r is WeeklyReview => r !== null)
     .sort((a, b) => b.week.localeCompare(a.week));
 }
@@ -221,9 +242,15 @@ const BLANK_META: Meta = { schema: SCHEMA, lastSettledOn: null, lastExportAt: nu
 export function getMeta(): Meta {
   const v = read(META);
   if (!isObject(v)) return { ...BLANK_META };
+  const settled = v['lastSettledOn'];
   return {
     schema: SCHEMA,
-    lastSettledOn: typeof v['lastSettledOn'] === 'string' ? v['lastSettledOn'] : null,
+    // Validated for the same reason `dueOn` is: settlement feeds this straight into
+    // `diffDays`, which throws on a non-date. That happens inside App's state
+    // initialiser, during render, where a throw is a blank page on every launch with
+    // no way back. Unreadable reads as "never settled", which is always safe — the
+    // 14-day floor still runs.
+    lastSettledOn: typeof settled === 'string' && isISODate(settled) ? settled : null,
     lastExportAt: typeof v['lastExportAt'] === 'string' ? v['lastExportAt'] : null,
   };
 }
@@ -266,6 +293,25 @@ function isISODate(v: string): boolean {
   return !Number.isNaN(d.getTime()) && toISO(d) === v;
 }
 
+/**
+ * 'YYYY-Www', and a week that year actually has. Same reason as `isISODate`:
+ * `weekStart` throws on anything else, and it is called while rendering the review
+ * history.
+ *
+ * Checked by round trip rather than by range, because most years have 52 weeks and
+ * a bare 01–53 test lets `2025-W53` through — `weekStart` resolves it to 29 December
+ * 2025, which is really `2026-W01`, so the history would show two rows covering the
+ * same dates.
+ */
+function isISOWeek(v: string): boolean {
+  if (!/^\d{4}-W\d{2}$/.test(v)) return false;
+  try {
+    return weekKey(weekStart(v)) === v;
+  } catch {
+    return false;
+  }
+}
+
 function keysWithPrefix(prefix: string): string[] {
   const out: string[] = [];
   try {
@@ -283,6 +329,10 @@ export function exportAll(now: Date = new Date()): string {
   const days: Record<ISODate, DayEntry> = {};
   for (const key of keysWithPrefix(DAY)) {
     const date = key.slice(DAY.length);
+    // Filtered on the way out as well as on the way in. A key that is not a date
+    // cannot be re-imported, so copying it into the backup only buys a permanent,
+    // unexplained "1 skipped" on every future restore.
+    if (!isISODate(date)) continue;
     const day = getDay(date);
     if (day) days[date] = day;
   }
@@ -351,7 +401,7 @@ export function importAll(json: string, dryRun = false): ImportResult {
   const reviews = doc['reviews'];
   if (isObject(reviews)) {
     for (const [week, raw] of Object.entries(reviews)) {
-      const incoming = parseReview(raw, week);
+      const incoming = isISOWeek(week) ? parseReview(raw, week) : null;
       if (!incoming) {
         result.skipped++;
         continue;

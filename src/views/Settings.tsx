@@ -4,15 +4,14 @@ import { todayISO } from '../dates';
 import { settleFrom } from '../settlement';
 import {
   type ImportResult,
+  StorageWriteError,
   exportAll,
   getMeta,
   importAll,
   markExported,
 } from '../storage';
-import type { ISODate } from '../types';
 
 interface SettingsProps {
-  today: ISODate;
   onBack: () => void;
 }
 
@@ -46,11 +45,25 @@ function summarise(r: ImportResult): string {
  * written — a restore onto a device that has been used since the export is the case
  * that has to not go wrong (ARCHITECTURE.md §4).
  */
-export function Settings({ today, onBack }: SettingsProps) {
+export function Settings({ onBack }: SettingsProps) {
+  // Read the clock here rather than take the app's focused date. Settlement expires
+  // every carry due before the date it is given, so a focused day of next Tuesday
+  // would expire carries that have not lapsed — and expiry has no undo. The focused
+  // date is wherever the user last tapped in the heatmap; it is not today.
+  const today = todayISO();
+
   const fileInput = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [lastExport, setLastExport] = useState(() => getMeta().lastExportAt);
+
+  /** Import is the most storage-hungry thing the app does, so it is the likeliest
+   *  place to be refused — and an uncaught throw out of a click handler unmounts the
+   *  app on top of a half-applied import. */
+  function onWriteError(err: unknown) {
+    if (err instanceof StorageWriteError) setMessage(err.message);
+    else throw err;
+  }
 
   function exportNow() {
     const json = exportAll();
@@ -58,7 +71,7 @@ export function Settings({ today, onBack }: SettingsProps) {
 
     const a = document.createElement('a');
     a.href = url;
-    a.download = `daily-${todayISO()}.json`;
+    a.download = `daily-${today}.json`;
     // In the document and revoked later, not immediately: Safari needs the anchor to
     // be a real node, and revoking on the next line can cancel the transfer before
     // the file is written. A stamped `lastExportAt` silences the backup reminder for
@@ -72,9 +85,13 @@ export function Settings({ today, onBack }: SettingsProps) {
       URL.revokeObjectURL(url);
     }, 30_000);
 
-    markExported();
-    setLastExport(getMeta().lastExportAt);
-    setMessage('Exported.');
+    try {
+      markExported();
+      setLastExport(getMeta().lastExportAt);
+      setMessage('Exported.');
+    } catch (err) {
+      onWriteError(err);
+    }
   }
 
   async function choose(file: File) {
@@ -93,15 +110,33 @@ export function Settings({ today, onBack }: SettingsProps) {
 
   function commit() {
     if (!pending) return;
-    const result = importAll(pending.json);
 
-    // A restored backup can hold carries that fell due months ago. Startup settlement
-    // only looks back 14 days, so without this they would sit as passes for ever and
-    // "expiry is automatic and retroactive" would quietly stop being true.
-    if (result.oldestDay) settleFrom(result.oldestDay, today);
+    // Taken from the preview, not the result, so it survives a write that fails
+    // halfway: the days already written keep their carries either way, and those
+    // carries are older than settlement's 14-day floor will ever reach again.
+    const oldest = pending.preview.oldestDay;
 
-    setPending(null);
-    setMessage(`Imported. ${summarise(result)}.`);
+    // A restored backup can hold carries that fell due months ago. Without this they
+    // would sit as passes for ever and "expiry is automatic and retroactive" would
+    // quietly stop being true.
+    const settleImported = () => {
+      if (oldest) settleFrom(oldest, today);
+    };
+
+    try {
+      const result = importAll(pending.json);
+      settleImported();
+
+      setPending(null);
+      setMessage(`Imported. ${summarise(result)}.`);
+    } catch (err) {
+      try {
+        settleImported();
+      } catch {
+        // Storage is refusing writes; the message below is the useful half.
+      }
+      onWriteError(err);
+    }
   }
 
   return (

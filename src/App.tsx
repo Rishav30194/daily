@@ -4,7 +4,7 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { ExportReminder } from './components/ExportReminder';
 import { addDays, isSunday, monthOf, todayISO } from './dates';
 import { runSettlement } from './settlement';
-import { getMeta, getRange } from './storage';
+import { StorageWriteError, getMeta, getRange } from './storage';
 import type { ISODate, YearMonth } from './types';
 import { Month } from './views/Month';
 import { Settings } from './views/Settings';
@@ -58,7 +58,15 @@ export function App() {
   // change. It is idempotent, so StrictMode's double invoke is harmless.
   const [focused, setFocused] = useState(() => {
     const today = todayISO();
-    runSettlement(today);
+    try {
+      runSettlement(today);
+    } catch (err) {
+      // A browser that refuses writes must not take the app down before it has
+      // rendered anything — this runs during render, where a throw is a blank page
+      // and no message. Expiry is idempotent and retries on the next open; the user
+      // meets the real explanation the first time they tap a control.
+      if (!(err instanceof StorageWriteError)) throw err;
+    }
     return today;
   });
 
@@ -137,7 +145,7 @@ export function App() {
           the export banner on Today, and with no browser history there is nothing
           else to carry that. */}
       {view === 'settings' && (
-        <Settings today={focused} onBack={() => setView(settingsOrigin)} />
+        <Settings onBack={() => setView(settingsOrigin)} />
       )}
 
       {view === 'year' && (
