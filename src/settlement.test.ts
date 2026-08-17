@@ -95,6 +95,36 @@ describe('settleFrom — restored backups', () => {
   });
 });
 
+describe('settleFrom is only ever given the real today', () => {
+  // Not a test of a caller, but of why the contract matters: `settleFrom` expires
+  // every carry due before the date it is handed. Passing the app's *focused* day —
+  // which is wherever the user last tapped in a heatmap, and can be in the future —
+  // silently expires carries that have not lapsed, and expiry has no undo.
+  test('a future date expires a carry that is still live', () => {
+    writeDayRaw(outstanding(TODAY, '2026-08-18')); // created today, due tomorrow
+
+    settleFrom(TODAY, '2026-08-25', NOW);
+
+    expect(getDay(TODAY)?.coding.status).toBe('expired');
+  });
+
+  test('the real today leaves that same carry alone', () => {
+    writeDayRaw(outstanding(TODAY, '2026-08-18'));
+
+    settleFrom(TODAY, TODAY, NOW);
+
+    expect(getDay(TODAY)?.coding.status).toBe('carried');
+  });
+
+  test('a past date never reaches the days that needed settling', () => {
+    writeDayRaw(outstanding('2026-08-14', '2026-08-15'));
+
+    settleFrom('2026-08-10', '2026-08-12', NOW);
+
+    expect(getDay('2026-08-14')?.coding.status).toBe('carried');
+  });
+});
+
 describe('settlement never invents entries', () => {
   test('days with no entry stay absent', () => {
     writeDayRaw(entry('2026-08-16'));

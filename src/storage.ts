@@ -94,7 +94,12 @@ function itemState(v: unknown): { status: DayEntry['coding']['status']; dueOn?: 
   if (!isObject(v)) return { status: 'pending' };
 
   const status = statuses.find((s) => s === v['status']) ?? 'pending';
-  const dueOn = typeof v['dueOn'] === 'string' ? v['dueOn'] : undefined;
+  // Only a real date survives. `dueOn` is read back by `parseISO` and `diffDays`,
+  // both of which throw on anything else — in settlement during startup, and in the
+  // carried line on Today. A corrupt value has to be dropped at the boundary, not
+  // met halfway through a render.
+  const raw = v['dueOn'];
+  const dueOn = typeof raw === 'string' && isISODate(raw) ? raw : undefined;
   return dueOn === undefined ? { status } : { status, dueOn };
 }
 
@@ -146,7 +151,10 @@ function parseDay(v: unknown, date: ISODate): DayEntry | null {
 function parseReview(v: unknown, week: ISOWeek): WeeklyReview | null {
   if (!isObject(v)) return null;
   return {
-    week: typeof v['week'] === 'string' ? v['week'] : week,
+    // The key wins, as it does for days. `weekStart` throws on anything that is not
+    // 'YYYY-Www', and the review list renders every stored week — so one bad value
+    // taken from a record would crash the view the app opens on every Sunday.
+    week,
     change: typeof v['change'] === 'string' ? v['change'] : '',
     updatedAt: typeof v['updatedAt'] === 'string' ? v['updatedAt'] : new Date(0).toISOString(),
   };
@@ -207,7 +215,11 @@ export function saveReview(week: ISOWeek, review: WeeklyReview, now: Date = new 
 /** Every stored review, newest week first. */
 export function getAllReviews(): WeeklyReview[] {
   return keysWithPrefix(REVIEW)
-    .map((k) => getReview(k.slice(REVIEW.length)))
+    .map((k) => k.slice(REVIEW.length))
+    // Filtered here as well as on import, because a key written before that check
+    // existed would otherwise still reach `weekStart` and throw mid-render.
+    .filter(isISOWeek)
+    .map(getReview)
     .filter((r): r is WeeklyReview => r !== null)
     .sort((a, b) => b.week.localeCompare(a.week));
 }
@@ -264,6 +276,15 @@ function isISODate(v: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = new Date(`${v}T00:00:00`);
   return !Number.isNaN(d.getTime()) && toISO(d) === v;
+}
+
+/** 'YYYY-Www', weeks 01–53. Same reason as `isISODate`: `weekStart` throws on
+ *  anything else, and it is called while rendering the review history. */
+function isISOWeek(v: string): boolean {
+  const m = /^\d{4}-W(\d{2})$/.exec(v);
+  if (!m || m[1] === undefined) return false;
+  const week = Number(m[1]);
+  return week >= 1 && week <= 53;
 }
 
 function keysWithPrefix(prefix: string): string[] {
@@ -351,7 +372,7 @@ export function importAll(json: string, dryRun = false): ImportResult {
   const reviews = doc['reviews'];
   if (isObject(reviews)) {
     for (const [week, raw] of Object.entries(reviews)) {
-      const incoming = parseReview(raw, week);
+      const incoming = isISOWeek(week) ? parseReview(raw, week) : null;
       if (!incoming) {
         result.skipped++;
         continue;

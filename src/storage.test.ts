@@ -392,6 +392,75 @@ describe('import trusts the key, not the record', () => {
   });
 });
 
+describe('reviews are keyed by their key, not their contents', () => {
+  test('a record whose inner week disagrees with its key is filed under the key', () => {
+    // `weekStart` throws on anything that is not 'YYYY-Www', and the review history
+    // renders every stored week — so one bad value crashes the Sunday screen.
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {},
+      reviews: { '2026-W33': { week: 'nonsense', change: 'x', updatedAt: NOW.toISOString() } },
+    });
+
+    importAll(doc);
+    expect(getReview('2026-W33')?.week).toBe('2026-W33');
+  });
+
+  test('a key that is not a week is skipped', () => {
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {},
+      reviews: {
+        nonsense: { change: 'x', updatedAt: NOW.toISOString() },
+        '2026-W99': { change: 'x', updatedAt: NOW.toISOString() },
+        '': { change: 'x', updatedAt: NOW.toISOString() },
+      },
+    });
+
+    expect(importAll(doc)).toMatchObject({ added: 0, skipped: 3 });
+    expect(getAllReviews()).toEqual([]);
+  });
+
+  test('a week key stored before the check existed is not returned', () => {
+    localStorage.setItem(
+      'daily:v1:review:nonsense',
+      JSON.stringify({ week: 'nonsense', change: 'x', updatedAt: NOW.toISOString() }),
+    );
+    saveReview('2026-W33', { week: '2026-W33', change: 'real', updatedAt: '' }, NOW);
+
+    expect(getAllReviews().map((r) => r.week)).toEqual(['2026-W33']);
+  });
+});
+
+describe('dueOn is a date or it is nothing', () => {
+  test('a corrupt dueOn is dropped on read', () => {
+    // It is fed to parseISO and diffDays, both of which throw — one of them while
+    // rendering the carried line on Today.
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried', dueOn: 'tomorrow' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'carried' });
+  });
+
+  test('a real dueOn survives', () => {
+    writeDayRaw(entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-08-18' } }));
+    expect(getDay('2026-08-17')?.coding.dueOn).toBe('2026-08-18');
+  });
+
+  test('an impossible date is dropped', () => {
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-02-30' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding.dueOn).toBeUndefined();
+  });
+});
+
 describe('import rejects bad input without losing data', () => {
   test('invalid JSON reports an error and changes nothing', () => {
     saveDay('2026-08-17', perfect('2026-08-17'), NOW);
