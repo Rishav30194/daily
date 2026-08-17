@@ -8,6 +8,7 @@ import {
   isWithinEditWindow,
   monthDates,
   rangeDates,
+  shiftMonth,
   toISO,
   weekKey,
   weekRange,
@@ -70,6 +71,26 @@ describe('daysInMonth / monthDates', () => {
     expect(days).toHaveLength(28);
     expect(days[0]).toBe('2026-02-01');
     expect(days[27]).toBe('2026-02-28');
+  });
+});
+
+describe('shiftMonth', () => {
+  test('steps forward and back within a year', () => {
+    expect(shiftMonth('2026-08', 1)).toBe('2026-09');
+    expect(shiftMonth('2026-08', -1)).toBe('2026-07');
+    expect(shiftMonth('2026-08', 0)).toBe('2026-08');
+  });
+
+  test('rolls the year over in both directions', () => {
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12');
+    expect(shiftMonth('2026-06', -12)).toBe('2025-06');
+  });
+
+  test('stepping from a long month into a short one keeps the month', () => {
+    // Naive Date arithmetic on the 31st lands in the month after February.
+    expect(shiftMonth('2026-01', 1)).toBe('2026-02');
+    expect(shiftMonth('2026-03', -1)).toBe('2026-02');
   });
 });
 

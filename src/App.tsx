@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import { settle } from './carry';
-import { addDays, diffDays, todayISO } from './dates';
+import { addDays, diffDays, monthOf, todayISO } from './dates';
 import { getMeta, getRange, saveMeta, writeDayRaw } from './storage';
 import type { ISODate } from './types';
+import { Month } from './views/Month';
 import { Today } from './views/Today';
 
 /** How far back a first run looks for outstanding carries. Nothing older can still
@@ -44,15 +45,15 @@ function runSettlement(today: ISODate): void {
   saveMeta({ ...meta, lastSettledOn: today });
 }
 
+type View = 'today' | 'month';
+
 /**
- * No router: three views behind component state.
+ * No router: the views live behind component state.
  *
  * The app runs standalone, with no browser chrome and no back button, so URL-based
  * navigation buys nothing it can use — deep links cannot be shared, history cannot
  * be navigated, and iOS relaunches at `start_url` regardless (ARCHITECTURE.md §7).
- *
- * Only the day view exists so far. The view switch itself arrives in phase 5, with
- * the second view.
+ * Back navigation is an explicit control on each screen.
  */
 export function App() {
   const {
@@ -66,15 +67,43 @@ export function App() {
   // Settlement runs in the initialiser, not an effect, because it must finish before
   // any view reads a day — otherwise the first paint shows a grade that is about to
   // change. It is idempotent, so StrictMode's double invoke is harmless.
-  const [focused] = useState(() => {
+  const [focused, setFocused] = useState(() => {
     const today = todayISO();
     runSettlement(today);
     return today;
   });
 
+  const [view, setView] = useState<View>('today');
+  const [ym, setYm] = useState(() => monthOf(focused));
+
+  // Without a router there is no navigation to reset the scroll position, so a tap
+  // on a heatmap cell would otherwise land halfway down the day's entry.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [view, focused, ym]);
+
+  function openMonth() {
+    setYm(monthOf(focused));
+    setView('month');
+  }
+
+  function openDay(date: ISODate) {
+    setFocused(date);
+    setView('today');
+  }
+
   return (
     <>
-      <Today date={focused} />
+      {view === 'today' ? (
+        <Today date={focused} onOpenMonth={openMonth} />
+      ) : (
+        <Month
+          ym={ym}
+          onChangeMonth={setYm}
+          onSelectDay={openDay}
+          onToday={() => openDay(todayISO())}
+        />
+      )}
 
       {needRefresh && (
         <div

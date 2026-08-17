@@ -16,6 +16,7 @@ import type { DayEntry, DoingItemId, ISODate } from '../types';
 
 interface TodayProps {
   date: ISODate;
+  onOpenMonth: () => void;
 }
 
 function blank(date: ISODate): DayEntry {
@@ -60,7 +61,7 @@ function Section({
  * The app is open for a minute and a half; a dropped write is far worse than a
  * redundant one.
  */
-export function Today({ date }: TodayProps) {
+export function Today({ date, onOpenMonth }: TodayProps) {
   const [entry, setEntry] = useState<DayEntry>(() => getDay(date) ?? blank(date));
   // Held separately because the carry banner writes to it: completing a carried
   // item lands on the day it came from, not on this one.
@@ -210,6 +211,19 @@ export function Today({ date }: TodayProps) {
         <div className="mt-2 border-t border-line pt-6">
           <EnglishGroup value={entry.english} onChange={(english) => update({ english })} />
         </div>
+      </div>
+
+      {/* The only way off this screen, and deliberately the last thing on it: the
+          ninety seconds are the point, and nothing may compete with them
+          (ARCHITECTURE.md §7). */}
+      <div className="mt-10 flex justify-center">
+        <button
+          type="button"
+          onClick={onOpenMonth}
+          className="min-h-11 text-sm text-muted underline underline-offset-4"
+        >
+          This month
+        </button>
       </div>
     </div>
   );
