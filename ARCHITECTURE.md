@@ -310,6 +310,18 @@ Three states, not two, and the distinction is required by SPEC.md §4:
 date falls in the 7 calendar days ending today, inclusive. `expired` carries still count — a carry
 that lapsed consumed a slot; letting expiry free the slot back up would reward failing.
 
+**A completed carry stops counting, and that is deliberate.** Finishing a carried item sets its
+status to `done`, which drops it out of this count and frees the slot — so more than two carries
+in a week are possible provided every one of them lands. Decided 2026-08-17, after the behaviour
+was flagged during phase 4: what the cap is there to prevent is a *backlog*, not deferral as such.
+Two unfinished carries means two things are already owed, and a third is how a bad week becomes an
+unrecoverable one. Someone who defers and then actually does the work has not accumulated
+anything.
+
+The stricter reading — every carry consumes a slot for seven days regardless of outcome — was
+considered and rejected. Do not "fix" this by counting `done` records with a `dueOn`; it is a
+decision, not an oversight, and changing it needs the same approval as any other hard limit.
+
 ### Settlement
 
 ```ts
