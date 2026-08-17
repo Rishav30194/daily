@@ -71,14 +71,15 @@ body {
   border-radius: 2px;
 }
 
-/* Transitions are removed under reduced motion, not shortened. */
+/* Transitions are removed under reduced motion, not shortened.
+   A 0.01ms duration is still a transition: it fires, it can still tear on a slow
+   repaint, and it is the usual way this rule gets half-kept (ARCHITECTURE.md §8). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
   }
 }

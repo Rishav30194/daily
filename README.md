@@ -8,8 +8,11 @@ It answers one question: *did I hold the line today, and which thing is breaking
 Single user, no accounts, no backend, no sync. A PWA on an iPhone home screen, opened once a day
 for about ninety seconds.
 
-> **Status: specification and planning complete. No code yet.** Build order is in
-> [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md).
+> **Status: built.** All nine phases in [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) are
+> done — today's entry, carry and settlement, month, weekly review, year, settings and the edit
+> lock — with 141 tests over the pure modules and storage. What remains is device verification:
+> installing it fresh on a phone and using it for a real day, and confirming the export download
+> and the update prompt behave inside a standalone iOS install.
 
 ---
 
@@ -60,8 +63,13 @@ not become one. See [`SPEC.md`](SPEC.md) §8.
 ## Stack
 
 Vite + React + TypeScript, Tailwind v4, `vite-plugin-pwa`, `localStorage`, deployed to GitHub
-Pages by GitHub Actions. No router, no state manager, no date library, no chart library, no
-backend. Nothing on the network at runtime.
+Pages by GitHub Actions. No router, no state manager, no chart library, no backend. Nothing on the
+network at runtime.
+
+The one runtime dependency beyond React is `date-fns`, used for exactly two things: the ISO
+week-year calculation behind the weekly review's storage key, and its inverse. The boundaries
+there are easy to get confidently wrong — 2027-01-01 is week 53 of 2026 — and the rest of the date
+handling is hand-rolled in `src/dates.ts`.
 
 ## Running it
 
