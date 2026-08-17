@@ -111,18 +111,30 @@ export function Settings({ onBack }: SettingsProps) {
   function commit() {
     if (!pending) return;
 
+    // Taken from the preview, not the result, so it survives a write that fails
+    // halfway: the days already written keep their carries either way, and those
+    // carries are older than settlement's 14-day floor will ever reach again.
+    const oldest = pending.preview.oldestDay;
+
+    // A restored backup can hold carries that fell due months ago. Without this they
+    // would sit as passes for ever and "expiry is automatic and retroactive" would
+    // quietly stop being true.
+    const settleImported = () => {
+      if (oldest) settleFrom(oldest, today);
+    };
+
     try {
       const result = importAll(pending.json);
-
-      // A restored backup can hold carries that fell due months ago. Startup
-      // settlement only looks back 14 days, so without this they would sit as passes
-      // for ever and "expiry is automatic and retroactive" would quietly stop being
-      // true.
-      if (result.oldestDay) settleFrom(result.oldestDay, today);
+      settleImported();
 
       setPending(null);
       setMessage(`Imported. ${summarise(result)}.`);
     } catch (err) {
+      try {
+        settleImported();
+      } catch {
+        // Storage is refusing writes; the message below is the useful half.
+      }
       onWriteError(err);
     }
   }
