@@ -102,12 +102,26 @@ function itemState(v: unknown): { status: DayEntry['coding']['status']; dueOn?: 
   const raw = v['dueOn'];
   const dueOn = typeof raw === 'string' && isISODate(raw) ? raw : undefined;
 
-  // A carry with no readable due date cannot expire: `settle` skips it, and
-  // `itemPasses` counts `carried` as a pass — so dropping the date alone would leave
-  // the day green for ever and hold a slot in the rolling window permanently.
-  // Reading it as lapsed keeps both invariants: it is not a pass, and the carry it
-  // records still counts. Never silently a pass.
-  if (status === 'carried' && dueOn === undefined) return { status: 'expired' };
+  // Half a carry is still a carry, and it must never read as a pass or as a free
+  // slot. Two halves can go missing, and both resolve to `expired`:
+  //
+  //   no readable date — `settle` skips a carry without a `dueOn` and `itemPasses`
+  //   counts `carried` as a pass, so the day would stay green for ever while holding
+  //   a slot in the rolling window;
+  //
+  //   a date with no status to match it — `dueOn` is only ever written alongside a
+  //   carry, and only `carried`, `done` and `expired` can carry one. Anything else
+  //   holding a date is a carry whose status was lost or corrupted; reading it as
+  //   `pending` would free its slot and put the carry control back on an item that
+  //   was already carried, which is both hard limits in SPEC.md §4 gone at once.
+  //
+  // `expired` is the honest reading of both: a carry happened, and nothing says it
+  // landed.
+  const canHoldDueOn = status === 'carried' || status === 'done' || status === 'expired';
+  const brokenCarry =
+    (status === 'carried' && dueOn === undefined) || (dueOn !== undefined && !canHoldDueOn);
+
+  if (brokenCarry) return { status: 'expired' };
 
   return dueOn === undefined ? { status } : { status, dueOn };
 }
@@ -251,7 +265,11 @@ export function getMeta(): Meta {
     // no way back. Unreadable reads as "never settled", which is always safe — the
     // 14-day floor still runs.
     lastSettledOn: typeof settled === 'string' && isISODate(settled) ? settled : null,
-    lastExportAt: typeof v['lastExportAt'] === 'string' ? v['lastExportAt'] : null,
+    // Validated too, and for a nastier reason than it looks: the reminder compares
+    // `now - lastExportAt` against 30 days, and arithmetic on an unparseable date is
+    // NaN, which fails every comparison. An unreadable value would switch off the
+    // only defence against iOS clearing site data — silently, for ever.
+    lastExportAt: isTimestamp(v['lastExportAt']) ? v['lastExportAt'] : null,
   };
 }
 
@@ -283,6 +301,12 @@ export interface ImportResult {
    *  from here: a restored backup can hold carries that fell due long ago, and they
    *  have to expire on arrival rather than sit as passes for ever. */
   oldestDay: ISODate | null;
+}
+
+/** A string `Date` can actually parse. Anything else turns into NaN in arithmetic,
+ *  and NaN fails every comparison silently rather than loudly. */
+function isTimestamp(v: unknown): v is string {
+  return typeof v === 'string' && !Number.isNaN(new Date(v).getTime());
 }
 
 /** 'YYYY-MM-DD' and a real calendar date. An import key that is neither is not a day

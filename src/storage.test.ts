@@ -487,6 +487,31 @@ describe('dueOn is a date or it is nothing', () => {
     expect(getDay('2026-08-17')?.coding.dueOn).toBeUndefined();
   });
 
+  test('a date with an unreadable status reads as lapsed, not as a free slot', () => {
+    // The mirror of the case above. `dueOn` is only ever written alongside a carry,
+    // so a record holding one with no status to match it is a corrupted carry.
+    // Falling back to `pending` would free its slot in the rolling window and put the
+    // carry control back on an item that was already carried.
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify({
+        date: '2026-08-17',
+        coding: { status: 'carried ', dueOn: '2026-08-18' }, // note the trailing space
+      }),
+    );
+
+    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'expired' });
+  });
+
+  test('a pending item has no business holding a due date', () => {
+    localStorage.setItem(
+      'daily:v1:day:2026-08-17',
+      JSON.stringify(entry('2026-08-17', { coding: { status: 'pending', dueOn: '2026-08-18' } })),
+    );
+
+    expect(getDay('2026-08-17')?.coding.status).toBe('expired');
+  });
+
   test('a done item keeps its shape when dueOn is corrupt', () => {
     // Only `carried` is coerced. A completed carry is already a pass on its merits.
     localStorage.setItem(
@@ -513,6 +538,22 @@ describe('meta survives corruption', () => {
   test('a real lastSettledOn survives', () => {
     saveMeta({ schema: 1, lastSettledOn: '2026-08-17', lastExportAt: null });
     expect(getMeta().lastSettledOn).toBe('2026-08-17');
+  });
+
+  test('an unreadable lastExportAt reads as never exported', () => {
+    // Date arithmetic on it yields NaN, and NaN >= 30 is false — so an unreadable
+    // value would switch the backup reminder off for ever, silently.
+    localStorage.setItem(
+      'daily:v1:meta',
+      JSON.stringify({ schema: 1, lastSettledOn: null, lastExportAt: 'whenever' }),
+    );
+
+    expect(getMeta().lastExportAt).toBeNull();
+  });
+
+  test('a real lastExportAt survives', () => {
+    markExported(NOW);
+    expect(getMeta().lastExportAt).toBe(NOW.toISOString());
   });
 });
 

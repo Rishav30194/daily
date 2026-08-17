@@ -95,17 +95,22 @@ describe('settleFrom — restored backups', () => {
   });
 });
 
-describe('settleFrom is only ever given the real today', () => {
-  // Not a test of a caller, but of why the contract matters: `settleFrom` expires
-  // every carry due before the date it is handed. Passing the app's *focused* day —
-  // which is wherever the user last tapped in a heatmap, and can be in the future —
-  // silently expires carries that have not lapsed, and expiry has no undo.
-  test('a future date expires a carry that is still live', () => {
+describe('settleFrom never settles past the real today', () => {
+  // `settleFrom` expires every carry due before the date it is handed, and expiry
+  // has no undo — so a caller handing it a future date destroys live carries. The
+  // app once did exactly that, passing the *focused* day, which follows whatever
+  // heatmap cell was last tapped. The date is clamped rather than trusted.
+  test('a future date cannot expire a carry that is still live', () => {
     writeDayRaw(outstanding(TODAY, '2026-08-18')); // created today, due tomorrow
 
     settleFrom(TODAY, '2026-08-25', NOW);
 
-    expect(getDay(TODAY)?.coding.status).toBe('expired');
+    expect(getDay(TODAY)?.coding.status).toBe('carried');
+  });
+
+  test('a future date does not stamp the future into meta', () => {
+    settleFrom(TODAY, '2026-08-25', NOW);
+    expect(getMeta().lastSettledOn).toBe(TODAY);
   });
 
   test('the real today leaves that same carry alone', () => {
@@ -114,6 +119,14 @@ describe('settleFrom is only ever given the real today', () => {
     settleFrom(TODAY, TODAY, NOW);
 
     expect(getDay(TODAY)?.coding.status).toBe('carried');
+  });
+
+  test('a lapsed carry still expires when the date is clamped', () => {
+    writeDayRaw(outstanding('2026-08-14', '2026-08-15'));
+
+    settleFrom('2026-08-14', '2026-08-25', NOW);
+
+    expect(getDay('2026-08-14')?.coding.status).toBe('expired');
   });
 
   test('a past date never reaches the days that needed settling', () => {
