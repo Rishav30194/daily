@@ -82,15 +82,32 @@ export function Heatmap({
           // The marker is an outline rather than a fourth fill: today is a position,
           // not a grade, and it must not read as one.
           const mark = date === marked ? 'outline outline-1 outline-offset-1 outline-muted' : '';
+          const shape = `aspect-square w-full ${radius} ${fill} ${mark}`;
+
+          // A cell with nowhere to go is not a control. Rendering it as a disabled
+          // button would announce it as one and swallow clicks meant for whatever
+          // wraps the grid — which is exactly how Year makes a whole month tappable.
+          if (!onSelect) {
+            return (
+              <div
+                key={date}
+                className={shape}
+                // At year size the month around it carries the name; 366 individually
+                // announced cells is not a way through a screen.
+                {...(size === 'year'
+                  ? { 'aria-hidden': true }
+                  : { role: 'img', 'aria-label': label(date, grade) })}
+              />
+            );
+          }
 
           return (
             <button
               key={date}
               type="button"
               aria-label={label(date, grade)}
-              onClick={onSelect ? () => onSelect(date) : undefined}
-              disabled={!onSelect}
-              className={`aspect-square w-full ${radius} ${fill} ${mark}`}
+              onClick={() => onSelect(date)}
+              className={shape}
             />
           );
         })}
