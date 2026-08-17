@@ -328,8 +328,17 @@ guards the UI's editing controls; it is not enforced in `storage.ts`.
 
 ## 7. Views and state
 
-No router. SPEC.md §9 rules it out, and re-introducing one brings back exactly the GitHub Pages
-subpath problems the base-path config is set up to avoid.
+No router — but not for the reason SPEC.md §9 gives.
+
+That section rules a router out because of GitHub Pages subpath problems. **That reason is wrong
+and is superseded here:** react-router takes a `basename` in one line, `HashRouter` sidesteps the
+question entirely, and phase 0 verified the base path works against a live iOS install.
+
+The reason that does hold is the display mode. The app runs `standalone`, with no browser chrome
+and no back button, so URL-based navigation buys nothing it can use: deep links can't be shared
+(sharing is an anti-feature), history can't be navigated without a back button, and state isn't
+restored either way because iOS relaunches at `start_url`. Three views and no server is what
+`useState` is for.
 
 `App.tsx` holds all navigation state:
 
@@ -438,9 +447,15 @@ live there too.
 - Match the file you're editing over any preference here.
 - Delete code rather than commenting it out. No `TODO` comments — do it, or write it into
   `IMPLEMENTATION_PHASES.md`.
-- No runtime dependencies beyond SPEC.md §9. In particular no date library and no chart library:
-  the two charts are a handful of SVG elements, and writing them is cheaper than auditing a
-  dependency's colour defaults against §8.
+- Runtime dependencies are SPEC.md §9's list plus **`date-fns`**, which is used for exactly one
+  thing: `weekKey`'s ISO week-year calculation in `dates.ts`. The boundaries there are genuinely
+  easy to get confidently wrong (2027-01-01 is 2026-W53), and a hand-rolled version is only as
+  correct as the author's understanding of the spec. The rest of `dates.ts` stays hand-rolled.
+- **No chart library.** Considered and declined on balance, not on size — the two charts are a
+  line with gaps and four bars, roughly forty lines of SVG, and hand-rolling keeps exact control
+  over the null-versus-zero gap rendering, which carries a real rule. Bundle weight was not the
+  deciding factor; a charting dependency would be precached and paid for once.
+- No state manager, no UI kit, no router (§7).
 
 **TypeScript**
 
