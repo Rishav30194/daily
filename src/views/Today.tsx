@@ -9,10 +9,11 @@ import { PhoneControl } from '../components/PhoneControl';
 import { SlotControl } from '../components/SlotControl';
 import { UrgeInput } from '../components/UrgeInput';
 import { CARRY_WINDOW_DAYS, canCarry, carriedInto, carryItem, completeCarried } from '../carry';
-import { addDays, todayISO } from '../dates';
+import { addDays, diffDays, isWithinEditWindow, todayISO } from '../dates';
 import { appliesOn } from '../grading';
 import { StorageFullError, getDay, getRange, saveDay } from '../storage';
 import type { DayEntry, DoingItemId, ISODate } from '../types';
+import { LockedDay } from './LockedDay';
 
 interface TodayProps {
   date: ISODate;
@@ -138,11 +139,20 @@ export function Today({ date, onOpenMonth }: TodayProps) {
     month: 'long',
   });
 
+  // Days older than seven are closed, and so are days that have not happened. The
+  // window is deliberately narrow: a record you can rewrite a month later is a record
+  // of what you would rather have done (SPEC.md §8).
+  const locked = !isWithinEditWindow(date, today);
+  const lockReason =
+    diffDays(date, today) < 0
+      ? 'This day has not happened yet.'
+      : "Older than 7 days. It reads, it doesn't change.";
+
   return (
     <div className="mx-auto w-full max-w-lg px-5 pb-16 pt-8">
       <header className="mb-7">
         <h1 className="font-serif text-2xl text-ink">{weekday}</h1>
-        {!officeApplies && (
+        {!officeApplies && !locked && (
           <p className="mt-1 text-xs text-faint">
             Weekend — the office target does not apply today.
           </p>
@@ -158,11 +168,16 @@ export function Today({ date, onOpenMonth }: TodayProps) {
         </p>
       )}
 
+      {locked && <LockedDay entry={entry} reason={lockReason} />}
+
       {/* Yesterday's debt sits above today's own work, because it is owed first. */}
       {isToday && (
         <CarriedInBanner items={carriedInto(previous, date)} onToggle={toggleCarriedIn} />
       )}
 
+      {/* Not rendered at all when locked — not rendered and disabled. There is no
+          control on screen to argue with. */}
+      {!locked && (
       <div className="grid gap-7">
         {/* No carry control here, ever: the phone item cannot be carried, which is
             why it is not a DoingItemId (SPEC.md §4). */}
@@ -212,6 +227,7 @@ export function Today({ date, onOpenMonth }: TodayProps) {
           <EnglishGroup value={entry.english} onChange={(english) => update({ english })} />
         </div>
       </div>
+      )}
 
       {/* The only way off this screen, and deliberately the last thing on it: the
           ninety seconds are the point, and nothing may compete with them

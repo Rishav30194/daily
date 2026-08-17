@@ -4,7 +4,6 @@ import { OptionButton } from './OptionButton';
 interface SlotControlProps {
   value: SystemDesignState;
   onChange: (next: SystemDesignState) => void;
-  readOnly?: boolean;
 }
 
 /**
@@ -19,7 +18,7 @@ interface SlotControlProps {
  * The app records which slot was used, not merely that it happened, because the
  * month view's 11:00-versus-3:00 split is what reveals a slot that is not real.
  */
-export function SlotControl({ value, onChange, readOnly = false }: SlotControlProps) {
+export function SlotControl({ value, onChange }: SlotControlProps) {
   const set = (status: ItemStatus, slot?: Slot) => {
     const same = value.status === status && value.slot === slot;
     if (same) {
@@ -38,7 +37,6 @@ export function SlotControl({ value, onChange, readOnly = false }: SlotControlPr
         label="Done at 11:00"
         hint="where it is meant to happen"
         selected={done('11:00')}
-        disabled={readOnly}
         onClick={() => set('done', '11:00')}
       />
 
@@ -47,7 +45,6 @@ export function SlotControl({ value, onChange, readOnly = false }: SlotControlPr
         hint="only when 11:00 genuinely was not possible"
         weight="secondary"
         selected={done('15:00')}
-        disabled={readOnly}
         onClick={() => set('done', '15:00')}
       />
 
@@ -56,7 +53,6 @@ export function SlotControl({ value, onChange, readOnly = false }: SlotControlPr
           label="Missed"
           weight="quiet"
           selected={value.status === 'missed'}
-          disabled={readOnly}
           onClick={() => set('missed')}
         />
       </div>

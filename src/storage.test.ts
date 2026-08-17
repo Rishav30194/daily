@@ -276,6 +276,54 @@ describe('import merges rather than clobbers', () => {
   });
 });
 
+describe('import dry run', () => {
+  const older = '2026-08-01T00:00:00.000Z';
+  const newer = '2026-08-20T00:00:00.000Z';
+
+  const doc = JSON.stringify({
+    schema: 1,
+    exportedAt: NOW.toISOString(),
+    days: {
+      '2026-08-17': { ...entry('2026-08-17', { note: 'incoming' }), updatedAt: newer },
+      '2026-08-18': { ...entry('2026-08-18', { note: 'new day' }), updatedAt: newer },
+      '2026-08-19': { ...entry('2026-08-19', { note: 'stale' }), updatedAt: older },
+    },
+    reviews: { '2026-W34': { week: '2026-W34', change: 'incoming', updatedAt: newer } },
+  });
+
+  function seed() {
+    writeDayRaw(entry('2026-08-17', { note: 'stored', updatedAt: older }));
+    writeDayRaw(entry('2026-08-19', { note: 'stored', updatedAt: newer }));
+  }
+
+  test('writes nothing', () => {
+    seed();
+    importAll(doc, true);
+
+    expect(getDay('2026-08-17')?.note).toBe('stored');
+    expect(getDay('2026-08-18')).toBeNull();
+    expect(getReview('2026-W34')).toBeNull();
+  });
+
+  test('returns the same counts the real import then produces', () => {
+    seed();
+    // The numbers shown before the commit have to be the numbers the commit makes
+    // true, which is why this runs the same merge rather than a second one.
+    const preview = importAll(doc, true);
+    const applied = importAll(doc);
+
+    expect(preview).toEqual({ added: 2, updated: 1, skipped: 1, ok: true });
+    expect(applied).toEqual(preview);
+    expect(getDay('2026-08-17')?.note).toBe('incoming');
+  });
+
+  test('reports a bad file without touching storage', () => {
+    seed();
+    expect(importAll('{oops', true).ok).toBe(false);
+    expect(getDay('2026-08-17')?.note).toBe('stored');
+  });
+});
+
 describe('import rejects bad input without losing data', () => {
   test('invalid JSON reports an error and changes nothing', () => {
     saveDay('2026-08-17', perfect('2026-08-17'), NOW);

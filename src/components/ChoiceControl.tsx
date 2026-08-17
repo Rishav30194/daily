@@ -4,7 +4,6 @@ import { OptionButton } from './OptionButton';
 interface ChoiceControlProps {
   value: CodingState;
   onChange: (next: CodingState) => void;
-  readOnly?: boolean;
 }
 
 /**
@@ -14,7 +13,7 @@ interface ChoiceControlProps {
  * Unlike the system-design slots these two are genuine equals: neither is a fallback,
  * so they are rendered side by side with the same weight.
  */
-export function ChoiceControl({ value, onChange, readOnly = false }: ChoiceControlProps) {
+export function ChoiceControl({ value, onChange }: ChoiceControlProps) {
   const set = (status: ItemStatus, choice?: CodeChoice) => {
     const same = value.status === status && value.choice === choice;
     if (same) {
@@ -32,13 +31,11 @@ export function ChoiceControl({ value, onChange, readOnly = false }: ChoiceContr
         <OptionButton
           label="Coding"
           selected={done('coding')}
-          disabled={readOnly}
           onClick={() => set('done', 'coding')}
         />
         <OptionButton
           label="Certification"
           selected={done('cert')}
-          disabled={readOnly}
           onClick={() => set('done', 'cert')}
         />
       </div>
@@ -48,7 +45,6 @@ export function ChoiceControl({ value, onChange, readOnly = false }: ChoiceContr
           label="Missed"
           weight="quiet"
           selected={value.status === 'missed'}
-          disabled={readOnly}
           onClick={() => set('missed')}
         />
       </div>

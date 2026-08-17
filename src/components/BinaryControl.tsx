@@ -5,7 +5,6 @@ interface BinaryControlProps {
   value: ItemState;
   onChange: (next: ItemState) => void;
   doneLabel?: string;
-  readOnly?: boolean;
 }
 
 /** Done or not. Used for the office work target, which is binary by definition:
@@ -14,7 +13,6 @@ export function BinaryControl({
   value,
   onChange,
   doneLabel = 'Done',
-  readOnly = false,
 }: BinaryControlProps) {
   const set = (status: ItemState['status']) => {
     onChange({ status: value.status === status ? 'pending' : status });
@@ -25,13 +23,11 @@ export function BinaryControl({
       <OptionButton
         label={doneLabel}
         selected={value.status === 'done'}
-        disabled={readOnly}
         onClick={() => set('done')}
       />
       <OptionButton
         label="Missed"
         selected={value.status === 'missed'}
-        disabled={readOnly}
         onClick={() => set('missed')}
       />
     </div>
