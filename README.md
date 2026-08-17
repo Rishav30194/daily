@@ -8,11 +8,14 @@ It answers one question: *did I hold the line today, and which thing is breaking
 Single user, no accounts, no backend, no sync. A PWA on an iPhone home screen, opened once a day
 for about ninety seconds.
 
-> **Status: built.** All nine phases in [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) are
-> done — today's entry, carry and settlement, month, weekly review, year, settings and the edit
-> lock — with 141 tests over the pure modules and storage. What remains is device verification:
-> installing it fresh on a phone and using it for a real day, and confirming the export download
-> and the update prompt behave inside a standalone iOS install.
+> **Status: built, deployed, and in use.** All the phases in
+> [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) are done — today's entry, carry and
+> settlement, month, weekly review, year, settings and the edit lock — with 141 tests over the pure
+> modules and storage.
+>
+> Verified on an installed iPhone home-screen app (2026-08-17): it opens standalone with no browser
+> chrome, the Settings export saves a JSON file to Files, and the service-worker update prompt
+> appears after a deploy and reloads into the new version.
 
 ---
 
