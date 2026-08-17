@@ -63,8 +63,14 @@ Everything else is neutral. Do not colour-code item rows.
 
 **Service worker** — `registerType: 'prompt'`. Never `autoUpdate`; it can swap the app mid-entry.
 
-**No router.** Three views via component state. A router reintroduces the GitHub Pages subpath
-problems the config deliberately avoids.
+**No router.** Three views via component state.
+
+SPEC.md §9 justifies this by GitHub Pages subpath problems. That reason does not hold — a router
+handles a subpath with one `basename`, and phase 0 proved the base path works. The real reason is
+that **the app runs standalone, where there is no browser chrome and no back button**: URLs buy
+deep links that can't be shared (sharing is an anti-feature), history that can't be navigated, and
+no restoration benefit, since iOS relaunches at `start_url` either way. Three views behind
+`useState` is the right size for that. Overruling this needs approval like any other hard limit.
 
 ### Anti-features — never added, including "just a small one"
 

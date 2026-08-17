@@ -11,6 +11,7 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "date-fns": "^4.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
@@ -26,6 +27,7 @@
     "vitest": "^3.2.4"
   },
   "allowScripts": {
-    "esbuild@0.28.2": true
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
   }
 }
