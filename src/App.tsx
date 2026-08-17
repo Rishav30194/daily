@@ -4,10 +4,11 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 import { settle } from './carry';
 import { addDays, diffDays, isSunday, monthOf, todayISO } from './dates';
 import { getMeta, getRange, saveMeta, writeDayRaw } from './storage';
-import type { ISODate } from './types';
+import type { ISODate, YearMonth } from './types';
 import { Month } from './views/Month';
 import { Today } from './views/Today';
 import { WeeklyReview } from './views/WeeklyReview';
+import { Year } from './views/Year';
 
 /** How far back a first run looks for outstanding carries. Nothing older can still
  *  be due: a carry lives one day. */
@@ -46,7 +47,7 @@ function runSettlement(today: ISODate): void {
   saveMeta({ ...meta, lastSettledOn: today });
 }
 
-type View = 'today' | 'month' | 'review';
+type View = 'today' | 'month' | 'year' | 'review';
 
 /**
  * No router: the views live behind component state.
@@ -79,12 +80,13 @@ export function App() {
   // screen to go and look at (ARCHITECTURE.md §7).
   const [view, setView] = useState<View>(() => (isSunday(focused) ? 'review' : 'today'));
   const [ym, setYm] = useState(() => monthOf(focused));
+  const [year, setYear] = useState(() => Number(focused.slice(0, 4)));
 
   // Without a router there is no navigation to reset the scroll position, so a tap
   // on a heatmap cell would otherwise land halfway down the day's entry.
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [view, focused, ym]);
+  }, [view, focused, ym, year]);
 
   function openMonth() {
     setYm(monthOf(focused));
@@ -94,6 +96,11 @@ export function App() {
   function openDay(date: ISODate) {
     setFocused(date);
     setView('today');
+  }
+
+  function openMonthOf(next: YearMonth) {
+    setYm(next);
+    setView('month');
   }
 
   return (
@@ -106,6 +113,19 @@ export function App() {
           onChangeMonth={setYm}
           onSelectDay={openDay}
           onToday={() => openDay(todayISO())}
+          onOpenYear={() => {
+            setYear(Number(ym.slice(0, 4)));
+            setView('year');
+          }}
+        />
+      )}
+
+      {view === 'year' && (
+        <Year
+          year={year}
+          onChangeYear={setYear}
+          onSelectMonth={openMonthOf}
+          onBack={() => setView('month')}
         />
       )}
 
