@@ -14,6 +14,24 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
 
+    // `dueOn?: ISODate` may be absent, but it may never be present-and-undefined.
+    // That distinction is not pedantry here: `{ status: 'carried', dueOn: undefined }`
+    // is the exact shape that produced a carry which could not expire and graded as
+    // a pass for ever. This makes it unrepresentable rather than merely guarded.
+    "exactOptionalPropertyTypes": true,
+
+    // The storage errors are a class hierarchy the views catch by base class.
+    "noImplicitOverride": true,
+
+    // Every defensive read in storage.ts treats unknown input as an index signature
+    // (`v['date']`), which is what keeps a malformed record from being trusted. This
+    // stops anyone reaching for `v.date` and quietly losing that.
+    "noPropertyAccessFromIndexSignature": true,
+
+    // A typo'd side-effect import — `import './index.css'` — otherwise fails at
+    // runtime as an unstyled app rather than at build time.
+    "noUncheckedSideEffectImports": true,
+
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,

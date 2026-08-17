@@ -455,12 +455,36 @@ The cases that must exist, because they are the rules most likely to be quietly 
 - Round-tripping `exportAll` → `importAll` is lossless, and import merges by `updatedAt` rather
   than clobbering.
 
-Storage tests run against a `localStorage` stub. Component tests are not planned; if the domain
-logic is right, the components are thin enough to verify by opening the app.
+Storage tests run against a `localStorage` stub.
 
-Vitest, `*.test.ts` beside the module it covers. Test names state the rule —
-`'slip caught counts as a pass'`, not `'grading test 3'`. No network in tests, ever; there is no
-network in the app.
+### Component tests, and why the original decision was reversed
+
+This section used to read: *"Component tests are not planned; if the domain logic is right, the
+components are thin enough to verify by opening the app."* That was wrong, and four rounds of
+review proved it (2026-08-17). The domain logic was right every time. The bugs were all in the
+join between a correct rule and the controls on top of it, and every one of them was invisible to
+a suite that only tested pure modules:
+
+- tapping **Missed** on a carried item overwrote the whole `ItemState`, erasing the carry, freeing
+  its slot in the rolling window and restoring the carry control — both hard limits in SPEC.md §4
+  bypassable in four taps;
+- `Settings` handed settlement the app's *focused* day rather than the clock, so importing while a
+  future date was selected expired carries that had not lapsed;
+- a locked day rendered `Done at 11:00` for a completed carry that recorded no slot;
+- a successful merge reported itself as a failure when the settlement that followed it was refused.
+
+So: **the wiring is tested, the styling is not.** A component test earns its place when it covers a
+join a pure test cannot reach — which control is rendered for a given state, which date a view
+hands to an irreversible operation, which value is shown for an absent field. Tests that assert
+class names, layout, or copy for its own sake do not.
+
+`jsdom` and `@testing-library/react`, dev dependencies only. The environment is set per file with
+`// @vitest-environment jsdom` rather than in a config file, so the default test run stays a plain
+Node one and nothing about the build changes.
+
+Vitest, `*.test.ts` beside the module it covers, `*.test.tsx` for a view. Test names state the
+rule — `'slip caught counts as a pass'`, not `'grading test 3'`. No network in tests, ever; there
+is no network in the app.
 
 ---
 
