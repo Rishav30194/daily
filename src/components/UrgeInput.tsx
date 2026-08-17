@@ -4,7 +4,7 @@ interface UrgeInputProps {
 }
 
 /**
- * How many times he wanted to open a feed today, whether or not he did.
+ * How many times you wanted to open a feed today, whether or not you did.
  *
  * Optional, and **blank is not zero**. An empty field means "not recorded"; a typed
  * 0 means "recorded, and it was zero" — a genuinely good day. The two stay distinct

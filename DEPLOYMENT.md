@@ -5,15 +5,15 @@ GitHub Actions → GitHub Pages, public repo, project site.
 | | |
 |---|---|
 | Repo | `daily` |
-| URL | `https://<github-username>.github.io/daily/` |
+| URL | `https://GITHUB_USERNAME.github.io/daily/` |
 | Vite `base` | `/daily/` |
-| Manifest `start_url` / `scope` | `/daily/` |
+| Manifest `start_url` and `scope` | `/daily/` |
 | Trigger | push to `main` |
 | Pages source | **GitHub Actions** (not "Deploy from a branch") |
 
-Replace `<github-username>` throughout once the repo exists. These four path values must agree
-exactly, trailing slash included. SPEC.md §9 calls this the silent-failure zone, and it is —
-every failure here is silent, and the symptoms are listed in §5 below.
+`GITHUB_USERNAME` is the account that owns the repo; replace it throughout. These four path
+values must agree exactly, trailing slash included. SPEC.md §9 calls this the silent-failure zone,
+and it is — every failure here is silent, and §5 lists the symptoms.
 
 ---
 
@@ -101,8 +101,10 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const BASE = '/daily/';
+
 export default defineConfig({
-  base: '/daily/',
+  base: BASE,
   plugins: [
     react(),
     tailwindcss(),
@@ -112,11 +114,12 @@ export default defineConfig({
       manifest: {
         name: 'Daily',
         short_name: 'Daily',
-        start_url: '/daily/',
-        scope: '/daily/',
+        description: 'A personal discipline tracker.',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#ffffff',
+        background_color: '#fafaf9',
+        theme_color: '#fafaf9',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
@@ -136,7 +139,7 @@ with no way to ship a fix.
 
 ```html
 <link rel="apple-touch-icon" sizes="180x180" href="/daily/apple-touch-icon.png" />
-<meta name="theme-color" content="#ffffff" />
+<meta name="theme-color" content="#fafaf9" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 ```
 
@@ -148,12 +151,12 @@ screenshot of the page. The `href` is absolute and includes the base path — a 
 
 ## 4. Verification checklist
 
-Run this after phase 0 and again before calling the project done. Every line is a real failure
+Run this after any change to `base`, the manifest, or the workflow. Every line is a real failure
 mode, not a formality.
 
 **Desktop**
 
-- [ ] `https://<github-username>.github.io/daily/` loads — not a 404, not a blank page.
+- [ ] `https://GITHUB_USERNAME.github.io/daily/` loads — not a 404, not a blank page.
 - [ ] DevTools → Network: **zero 404s**. Especially `/assets/*.js` and `*.css`.
 - [ ] DevTools → Application → Manifest: no errors; `start_url` and `scope` both read `/daily/`.
 - [ ] DevTools → Application → Service Workers: one worker, activated.
@@ -178,10 +181,10 @@ Fix it before building anything else.
 | Blank white page, 404s on every `/assets/*` | `base` missing or wrong | `base: '/daily/'` in `vite.config.ts` |
 | 404 on the URL itself | Pages source still "Deploy from a branch" | Settings → Pages → Source: GitHub Actions |
 | Workflow green, site never updates | Same as above | Same as above |
-| Home-screen app opens in a browser tab | `scope`/`start_url` ≠ `base` | Make all three `/daily/`, reinstall to home screen |
+| Home-screen app opens in a browser tab | `scope` or `start_url` disagrees with `base` | Make all three `/daily/`, reinstall to home screen |
 | Home-screen icon is a page screenshot | `apple-touch-icon` link missing or path wrong | Absolute `/daily/apple-touch-icon.png` in `index.html` |
-| Icon fine, splash wrong | `background_color` / `theme_color` unset | Set both in the manifest |
-| Deploy fails on permissions | Missing `pages: write` / `id-token: write`, or one merged job | Copy §2 exactly |
+| Icon fine, splash wrong | `background_color` or `theme_color` unset | Set both in the manifest |
+| Deploy fails on permissions | Missing `pages: write` or `id-token: write`, or one merged job | Copy §2 exactly |
 | Old version keeps loading after deploy | Cached SW; prompt dismissed | Reopen the app and accept the prompt; last resort, delete and reinstall — **this wipes `localStorage`, so export first** |
 | `npm ci` fails in CI | `package-lock.json` not committed | Commit it |
 
@@ -209,7 +212,7 @@ rollback never touches it.
 
 ```bash
 npm install
-npm run dev            # http://localhost:5173/daily/  — note the base path
+npm run dev            # http://localhost:5173/daily/  — the base path is required
 npm test
 npm run build
 npm run preview        # serves dist/ at the real base path
@@ -219,8 +222,8 @@ npm run preview        # serves dist/ at the real base path
 gives a 404 — that is correct, not a bug.
 
 **The service worker only exists in a production build.** Test install, offline, and the update
-prompt against `npm run preview` or the deployed site; `npm run dev` will never show them.
+prompt against `npm run preview` or the deployed site; `npm run dev` never shows them.
 
-Dev and production are separate `localStorage` origins (`localhost:5173` vs `github.io`), so dev
-entries never contaminate real data — and real data is never available in dev. Use export/import
-to move a snapshot between them.
+Dev and production are separate `localStorage` origins (`localhost:5173` and `github.io`), so dev
+entries never contaminate real data — and real data is never available in dev. Use export and
+import to move a snapshot between them.

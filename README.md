@@ -10,8 +10,8 @@ for about ninety seconds.
 
 > **Status: built, deployed, and in use.** All the phases in
 > [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) are done — today's entry, carry and
-> settlement, month, weekly review, year, settings and the edit lock — with 141 tests over the pure
-> modules and storage.
+> settlement, month, weekly review, year, settings and the edit lock — with 188 tests over the pure
+> modules, storage, and the view wiring.
 >
 > Verified on an installed iPhone home-screen app (2026-08-17): it opens standalone with no browser
 > chrome, the Settings export saves a JSON file to Files, and the service-worker update prompt
@@ -25,7 +25,7 @@ for about ninety seconds.
 
 | Item | Recorded as |
 |---|---|
-| Phone | `Clean` / `Slip caught` / `Lost` — three states, not a checkbox |
+| Phone | `Clean`, `Slip caught`, or `Lost` — three states, not a checkbox |
 | System design, 45 min | Which slot: **11:00 AM** (default) or 3:00 PM (fallback only) |
 | Coding or Claude cert, 45 min | Which one was done |
 | Office work target | Done or not |
@@ -46,13 +46,13 @@ of two carries per rolling seven days. The phone item can never be carried.
 
 **Month view** — a calendar heatmap, grade counts, a completion-rate bar per item (this is the
 diagnostic: it says *which* item is failing, which a day colour can't), an urge-count chart with a
-7-day average, the English rate, and the 11:00-vs-3:00 split. A year overview sits one click
+7-day average, the English rate, and the 11:00 versus 3:00 split. A year overview sits one click
 further out.
 
 **Weekly review** — on Sunday the app opens to the week's grades, names the item with the most
 misses directly, and asks for one change for next week.
 
-## What it will never have
+## What it never has
 
 No notifications, badges, or reminders. No points, levels, streaks-as-pressure, confetti, or
 celebratory animation. No accounts, sync, social, or sharing. No history beyond month and year.
@@ -71,8 +71,8 @@ network at runtime.
 
 The one runtime dependency beyond React is `date-fns`, used for exactly two things: the ISO
 week-year calculation behind the weekly review's storage key, and its inverse. The boundaries
-there are easy to get confidently wrong — 2027-01-01 is week 53 of 2026 — and the rest of the date
-handling is hand-rolled in `src/dates.ts`.
+there are subtle enough to get confidently wrong — 2027-01-01 is week 53 of 2026 — and the rest
+of the date handling is hand-rolled in `src/dates.ts`.
 
 ## Running it
 
@@ -85,12 +85,13 @@ npm run preview        # serves the production build at the real base path
 ```
 
 The service worker only exists in a production build. Test install, offline, and the update prompt
-against `npm run preview` or the deployed site — `npm run dev` will never show them.
+against `npm run preview` or the deployed site — `npm run dev` never shows them.
 
 ## Deploying
 
 Push to `main`. GitHub Actions builds and publishes to Pages at
-`https://<github-username>.github.io/daily/`.
+`https://GITHUB_USERNAME.github.io/daily/`, where `GITHUB_USERNAME` is the account that owns the
+repo.
 
 `base`, `start_url`, and `scope` must all read `/daily/`. If they disagree the deploy fails
 silently — a blank page, or an app that opens in a Safari tab instead of standalone. Full setup,

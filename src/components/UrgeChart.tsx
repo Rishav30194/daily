@@ -36,8 +36,8 @@ function runs(values: (number | null)[]): { i: number; v: number }[][] {
  * component specifically. A blank day must be a **gap in the line** and a zero day a
  * **point at zero**, which is a distinction most charting libraries erase by default
  * and all of them make you fight for. Here it is the shape of the data structure:
- * `runs()` breaks the line at every null, and a recorded zero is just a dot sitting
- * on the baseline.
+ * `runs()` breaks the line at every null, and a recorded zero is a dot sitting on
+ * the baseline.
  *
  * Neutral throughout. Green, amber and red belong to the heatmap alone.
  */

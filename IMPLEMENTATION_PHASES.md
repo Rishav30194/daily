@@ -3,6 +3,9 @@
 Ten phases, each one independently verifiable. [`SPEC.md`](SPEC.md) is what to build,
 [`ARCHITECTURE.md`](ARCHITECTURE.md) is how it fits together, this is the order.
 
+**All ten phases are merged and deployed** (2026-08-17). The order below is now the record of how
+the app was built and what each part has to keep doing, not a queue of work.
+
 **One branch per phase.** `feature/phase-N-<slug>`, PR to `main`, never commit to `main` directly.
 Do not start phase N+1 until phase N's exit criteria are met — the point of the ordering is that
 each phase leaves the app in a state that can be checked, not that the work gets divided evenly.
@@ -32,8 +35,8 @@ standalone, and both are far cheaper to debug against a one-line page than again
 
 **Exit:** the deployed URL loads on the phone, installs to the home screen, and opens **standalone
 with no browser chrome**. Every item on the DEPLOYMENT.md verification checklist passes. If the
-app opens in a browser tab, phase 0 is not done — that is the `scope`/`start_url` mismatch and it
-does not get easier to fix later.
+app opens in a browser tab, phase 0 is not done — that is `scope` or `start_url` disagreeing with
+`base`, and it does not get cheaper to fix later.
 
 ---
 
@@ -53,7 +56,7 @@ Adding Vitest changes `package.json` — get approval with the phase.
 
 **Exit:** `npm test` green, and every case in ARCHITECTURE.md §10 that doesn't involve storage is
 written and passing. Not "some tests exist" — those specific cases, because they are the ones a
-later refactor will break silently.
+later refactor breaks silently.
 
 ---
 
@@ -62,7 +65,7 @@ later refactor will break silently.
 - `storage.ts` — the five fixed functions plus the four extensions in ARCHITECTURE.md §4, and
   nothing else.
 - Key scheme, `schema: 1` stamping, defensive reads (bad JSON reads as absent, never throws).
-- `exportAll` / `importAll` with merge-by-`updatedAt` and the import summary.
+- `exportAll` and `importAll` with merge-by-`updatedAt` and the import summary.
 - `QuotaExceededError` handling.
 - Tests against a `localStorage` stub, including the export→import round trip.
 
@@ -79,7 +82,7 @@ The ninety-second flow. Everything except carry.
   a checkbox), `SlotControl` (11:00 primary, 3:00 visually subordinate — see ARCHITECTURE.md §8),
   `ChoiceControl`, `BinaryControl`, `EnglishGroup` shown as `n/3`, `UrgeInput` where blank is a
   real value, and the one-line note.
-- Weekend shape: office target is not rendered at all on Sat/Sun.
+- Weekend shape: office target is not rendered at all on Saturday and Sunday.
 - Save on change, straight through `storage.ts`.
 - The type pairing and neutral palette get chosen here, once, and not revisited per-phase.
 
@@ -116,7 +119,7 @@ The diagnostic screen: the day colour says a day broke, this says *which item*.
 - Urge line chart with the 7-day trailing average — blank days are a **gap in the line**, zero days
   are a **point at zero**, and blank days are excluded from the average's denominator.
 - English rate, visually separate from everything above.
-- The 11:00 vs 3:00 split for system design.
+- The 11:00 versus 3:00 split for system design.
 
 **Exit:** a month of hand-seeded entries renders correctly, including a month with blank days,
 zero-urge days, and a retroactively expired carry.
@@ -140,7 +143,7 @@ last week's answer is visible.
 
 ## Phase 7 — Year overview
 
-- `Year.tsx`: 365/366 cells reusing `Heatmap`, clicking a month opens `Month` for it.
+- `Year.tsx`: 365 or 366 cells reusing `Heatmap`, clicking a month opens `Month` for it.
 - Reachable from Month only.
 
 Heatmap only. No annual statistics, no "best month", no totals. It answers one question — how much
@@ -154,7 +157,7 @@ dashboard.
 ## Phase 8 — Settings, export, and the edit lock
 
 - `Settings.tsx`: export to a downloaded JSON file, import with the summary shown before commit,
-  and the storage caveats from SPEC.md §9 stated in the UI, not just the README.
+  and the storage caveats from SPEC.md §9 stated in the UI, not only the README.
 - The monthly export reminder banner, driven by `meta.lastExportAt`, dismissable for the session.
 - The 7-day edit lock in `Today.tsx`: read-only rendering for days older than 7 days and for
   future days — values shown with no affordance to change them, not disabled inputs.

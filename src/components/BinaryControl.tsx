@@ -8,7 +8,7 @@ interface BinaryControlProps {
 }
 
 /** Done or not. Used for the office work target, which is binary by definition:
- *  did he finish what he set out to do at work (SPEC.md §2.1). */
+ *  did you finish what you set out to do at work (SPEC.md §2.1). */
 export function BinaryControl({
   value,
   onChange,
