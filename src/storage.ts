@@ -1,4 +1,4 @@
-import { monthDates, rangeDates } from './dates';
+import { monthDates, rangeDates, toISO } from './dates';
 import type {
   DayEntry,
   ISODate,
@@ -25,12 +25,30 @@ const META = `${PREFIX}meta`;
 
 const SCHEMA = 1 as const;
 
-/** Thrown when the device refuses a write. The only storage error the user ever
- *  sees, because the only remedy is to export. */
-export class StorageFullError extends Error {
+/** A write the device refused. Views catch this base class, so a new reason for a
+ *  refusal cannot escape as an unhandled throw out of a click handler. */
+export class StorageWriteError extends Error {}
+
+/** Out of room. The only remedy is to export, so that is what the message says. */
+export class StorageFullError extends StorageWriteError {
   constructor() {
     super('Storage is full. Export your data from settings to avoid losing entries.');
     this.name = 'StorageFullError';
+  }
+}
+
+/**
+ * Storage exists but will not accept writes — private mode, blocked cookies, a
+ * locked-down browser.
+ *
+ * Reads already treat this as "nothing stored" rather than throwing. Writes have to
+ * match: crashing the tree on the first tap is worse than saying plainly that
+ * nothing is being kept.
+ */
+export class StorageUnavailableError extends StorageWriteError {
+  constructor() {
+    super('This browser is not saving data, so entries will be lost. Check private browsing.');
+    this.name = 'StorageUnavailableError';
   }
 }
 
@@ -59,7 +77,7 @@ function write(key: string, value: unknown): void {
     if (err instanceof Error && (err.name === 'QuotaExceededError' || err.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
       throw new StorageFullError();
     }
-    throw err;
+    throw new StorageUnavailableError();
   }
 }
 
@@ -106,7 +124,10 @@ function parseDay(v: unknown, date: ISODate): DayEntry | null {
 
   return {
     schema: SCHEMA,
-    date: typeof v['date'] === 'string' ? v['date'] : date,
+    // The key an entry is filed under is the truth, never the `date` inside it. They
+    // disagree only in a hand-edited or corrupt export, and trusting the record would
+    // let it overwrite a different day than the one the merge just compared.
+    date,
     phone: phones.find((p) => p === v['phone']) ?? null,
     systemDesign: slot === undefined ? sd : { ...sd, slot },
     coding: choice === undefined ? cd : { ...cd, choice },
@@ -226,10 +247,23 @@ export interface ExportDocument {
 export interface ImportResult {
   added: number;
   updated: number;
-  /** Records skipped because the stored copy is newer or identical. */
+  /** Records skipped because the stored copy is newer or identical, or the key was
+   *  not a date. */
   skipped: number;
   ok: boolean;
   error?: string;
+  /** Oldest day the document touched, or null if it contained none. Callers settle
+   *  from here: a restored backup can hold carries that fell due long ago, and they
+   *  have to expire on arrival rather than sit as passes for ever. */
+  oldestDay: ISODate | null;
+}
+
+/** 'YYYY-MM-DD' and a real calendar date. An import key that is neither is not a day
+ *  and must not become a storage key. */
+function isISODate(v: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00`);
+  return !Number.isNaN(d.getTime()) && toISO(d) === v;
 }
 
 function keysWithPrefix(prefix: string): string[] {
@@ -280,7 +314,7 @@ export function exportAll(now: Date = new Date()): string {
  * rule living in the UI is a rule that can disagree with itself.
  */
 export function importAll(json: string, dryRun = false): ImportResult {
-  const result: ImportResult = { added: 0, updated: 0, skipped: 0, ok: true };
+  const result: ImportResult = { added: 0, updated: 0, skipped: 0, ok: true, oldestDay: null };
 
   let doc: unknown;
   try {
@@ -294,11 +328,13 @@ export function importAll(json: string, dryRun = false): ImportResult {
   }
 
   for (const [date, raw] of Object.entries(doc['days'])) {
-    const incoming = parseDay(raw, date);
+    const incoming = isISODate(date) ? parseDay(raw, date) : null;
     if (!incoming) {
       result.skipped++;
       continue;
     }
+
+    if (result.oldestDay === null || date < result.oldestDay) result.oldestDay = date;
 
     const existing = getDay(date);
     if (!existing) {

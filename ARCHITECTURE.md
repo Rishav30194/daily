@@ -322,6 +322,14 @@ The stricter reading — every carry consumes a slot for seven days regardless o
 considered and rejected. Do not "fix" this by counting `done` records with a `dueOn`; it is a
 decision, not an oversight, and changing it needs the same approval as any other hard limit.
 
+**This only holds because a carry cannot be withdrawn.** `Today.tsx` renders a `carried` item as a
+line of text with no controls at all, and an `expired` one the same way. That is load-bearing, not
+presentation: the item controls replace the whole `ItemState`, so leaving them on screen lets
+`{status:'carried', dueOn}` be overwritten with `{status:'missed'}` — which erases the carry,
+frees its slot, and brings the carry control back. Carry, un-carry, carry again, for ever. If a
+carried item ever regains an editable control, the two-a-week cap and "an item cannot be carried
+twice" both stop meaning anything. Found in review, 2026-08-17.
+
 ### Settlement
 
 ```ts

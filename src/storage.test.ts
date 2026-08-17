@@ -312,7 +312,13 @@ describe('import dry run', () => {
     const preview = importAll(doc, true);
     const applied = importAll(doc);
 
-    expect(preview).toEqual({ added: 2, updated: 1, skipped: 1, ok: true });
+    expect(preview).toEqual({
+      added: 2,
+      updated: 1,
+      skipped: 1,
+      ok: true,
+      oldestDay: '2026-08-17',
+    });
     expect(applied).toEqual(preview);
     expect(getDay('2026-08-17')?.note).toBe('incoming');
   });
@@ -321,6 +327,68 @@ describe('import dry run', () => {
     seed();
     expect(importAll('{oops', true).ok).toBe(false);
     expect(getDay('2026-08-17')?.note).toBe('stored');
+  });
+});
+
+describe('import trusts the key, not the record', () => {
+  test('a record whose inner date disagrees with its key is filed under the key', () => {
+    // Otherwise a hand-edited export overwrites a day the merge never compared.
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {
+        '2026-08-17': { ...entry('2026-01-01', { note: 'lying' }), date: '2026-01-01' },
+      },
+      reviews: {},
+    });
+
+    importAll(doc);
+    expect(getDay('2026-08-17')?.note).toBe('lying');
+    expect(getDay('2026-08-17')?.date).toBe('2026-08-17');
+    expect(getDay('2026-01-01')).toBeNull();
+  });
+
+  test('a newer local entry survives a record filed under someone else s date', () => {
+    writeDayRaw(entry('2026-01-01', { note: 'mine', updatedAt: '2026-08-20T00:00:00.000Z' }));
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: {
+        '2026-08-17': {
+          ...entry('2026-01-01', { note: 'theirs' }),
+          date: '2026-01-01',
+          updatedAt: '2026-08-25T00:00:00.000Z',
+        },
+      },
+      reviews: {},
+    });
+
+    importAll(doc);
+    expect(getDay('2026-01-01')?.note).toBe('mine');
+  });
+
+  test('a key that is not a date is skipped, not written', () => {
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: { 'not-a-date': entry('2026-08-17'), '2026-02-30': entry('2026-08-17') },
+      reviews: {},
+    });
+
+    const result = importAll(doc);
+    expect(result).toMatchObject({ added: 0, skipped: 2, oldestDay: null });
+    expect(localStorage.getItem('daily:v1:day:not-a-date')).toBeNull();
+  });
+
+  test('reports the oldest day it touched, for settlement', () => {
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: { '2026-08-17': entry('2026-08-17'), '2025-03-04': entry('2025-03-04') },
+      reviews: {},
+    });
+
+    expect(importAll(doc, true).oldestDay).toBe('2025-03-04');
   });
 });
 

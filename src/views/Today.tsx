@@ -9,10 +9,10 @@ import { PhoneControl } from '../components/PhoneControl';
 import { SlotControl } from '../components/SlotControl';
 import { UrgeInput } from '../components/UrgeInput';
 import { CARRY_WINDOW_DAYS, canCarry, carriedInto, carryItem, completeCarried } from '../carry';
-import { addDays, diffDays, isWithinEditWindow, todayISO } from '../dates';
+import { addDays, diffDays, isWithinEditWindow, parseISO, todayISO } from '../dates';
 import { appliesOn } from '../grading';
-import { StorageFullError, getDay, getRange, saveDay } from '../storage';
-import type { DayEntry, DoingItemId, ISODate } from '../types';
+import { StorageWriteError, getDay, getRange, saveDay } from '../storage';
+import type { DayEntry, DoingItemId, ISODate, ItemState } from '../types';
 import { LockedDay } from './LockedDay';
 
 interface TodayProps {
@@ -81,9 +81,10 @@ export function Today({ date, onOpenMonth }: TodayProps) {
       saveDay(target, next);
       setStorageError(null);
     } catch (err) {
-      // The only storage error the user ever sees, because the only remedy is
-      // to export.
-      if (err instanceof StorageFullError) setStorageError(err.message);
+      // The only storage errors the user ever sees. Both are shown rather than
+      // rethrown: throwing out of a click handler unmounts the app, which is a worse
+      // answer to "this browser won't save" than saying so.
+      if (err instanceof StorageWriteError) setStorageError(err.message);
       else throw err;
     }
   }
@@ -121,6 +122,37 @@ export function Today({ date, onOpenMonth }: TodayProps) {
         verdict={canCarry(item, entry, carryWindow, today)}
         onCarry={() => carry(item)}
       />
+    );
+  }
+
+  /**
+   * A carried or expired item is decided, and its own controls go away.
+   *
+   * Without this the controls overwrite the whole item state, so tapping "Missed" on
+   * a carried item deletes the carry — freeing its slot in the rolling window and
+   * bringing the carry control back. That is a way round both "an item cannot be
+   * carried twice" and the two-a-week cap, which are hard limits (SPEC.md §4).
+   *
+   * Expired is locked for the same reason in the other direction: expiry has no undo,
+   * so it must not be editable back into a pass.
+   */
+  function settledItem(state: ItemState): string | null {
+    if (state.status === 'carried') {
+      const due = state.dueOn ? parseISO(state.dueOn).toLocaleDateString(undefined, { weekday: 'long' }) : 'tomorrow';
+      return `Carried to ${due}. Finish it there, or it becomes a miss on this day.`;
+    }
+    if (state.status === 'expired') return 'Carried, then missed. This cannot be changed.';
+    return null;
+  }
+
+  function itemSection(item: DoingItemId, control: React.ReactNode) {
+    const settled = settledItem(entry[item]);
+    if (settled) return <p className="text-sm text-muted">{settled}</p>;
+    return (
+      <>
+        {control}
+        {carryControl(item)}
+      </>
     );
   }
 
@@ -186,24 +218,30 @@ export function Today({ date, onOpenMonth }: TodayProps) {
         </Section>
 
         <Section title="System design" note="45 min during the workday">
-          <SlotControl
-            value={entry.systemDesign}
-            onChange={(systemDesign) => update({ systemDesign })}
-          />
-          {carryControl('systemDesign')}
+          {itemSection(
+            'systemDesign',
+            <SlotControl
+              value={entry.systemDesign}
+              onChange={(systemDesign) => update({ systemDesign })}
+            />,
+          )}
         </Section>
 
         <Section title="Coding / certification" note="45 min, one or the other">
-          <ChoiceControl value={entry.coding} onChange={(coding) => update({ coding })} />
-          {carryControl('coding')}
+          {itemSection(
+            'coding',
+            <ChoiceControl value={entry.coding} onChange={(coding) => update({ coding })} />,
+          )}
         </Section>
 
         {/* Weekends drop the office target entirely — not rendered, not counted,
             not shown as failed (SPEC.md §5). */}
         {officeApplies && (
           <Section title="Office target" note="did you finish what you set out to do">
-            <BinaryControl value={entry.office} onChange={(office) => update({ office })} />
-            {carryControl('office')}
+            {itemSection(
+              'office',
+              <BinaryControl value={entry.office} onChange={(office) => update({ office })} />,
+            )}
           </Section>
         )}
 

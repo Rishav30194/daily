@@ -56,8 +56,23 @@ export function LockedDay({ entry, reason }: LockedDayProps) {
     Boolean,
   ).length;
 
-  const slot = entry.systemDesign.slot === '15:00' ? '3:00' : '11:00';
-  const choice = entry.coding.choice === 'cert' ? 'Certification' : 'Coding';
+  // No invented detail. A carry completed from the next day's banner is `done` with
+  // no slot and no choice recorded, and showing "Done at 11:00" for it would put a
+  // slot in the record that was never used — and disagree with the month view, whose
+  // 11:00-vs-3:00 split skips exactly those entries.
+  const slot =
+    entry.systemDesign.slot === '15:00'
+      ? 'Done at 3:00'
+      : entry.systemDesign.slot === '11:00'
+        ? 'Done at 11:00'
+        : 'Done';
+
+  const choice =
+    entry.coding.choice === 'cert'
+      ? 'Certification'
+      : entry.coding.choice === 'coding'
+        ? 'Coding'
+        : 'Done';
 
   return (
     <div>
@@ -65,10 +80,7 @@ export function LockedDay({ entry, reason }: LockedDayProps) {
 
       <div>
         <Row label={ITEM_LABELS.phone} value={entry.phone ? PHONE[entry.phone] : '—'} />
-        <Row
-          label={ITEM_LABELS.systemDesign}
-          value={itemValue(entry.systemDesign, `Done at ${slot}`)}
-        />
+        <Row label={ITEM_LABELS.systemDesign} value={itemValue(entry.systemDesign, slot)} />
         <Row label={ITEM_LABELS.coding} value={itemValue(entry.coding, choice)} />
         {officeApplies && <Row label={ITEM_LABELS.office} value={itemValue(entry.office, 'Done')} />}
 
