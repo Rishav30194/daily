@@ -4,7 +4,6 @@ import { OptionButton } from './OptionButton';
 interface PhoneControlProps {
   value: PhoneState | null;
   onChange: (value: PhoneState | null) => void;
-  readOnly?: boolean;
 }
 
 /**
@@ -17,7 +16,7 @@ interface PhoneControlProps {
  * The three are rendered as equal siblings. Unlike the system-design slots there is
  * no fallback here — these are outcomes, not choices.
  */
-export function PhoneControl({ value, onChange, readOnly = false }: PhoneControlProps) {
+export function PhoneControl({ value, onChange }: PhoneControlProps) {
   const states: { state: PhoneState; label: string; hint: string }[] = [
     { state: 'clean', label: 'Clean', hint: 'no feed video at all' },
     { state: 'slip', label: 'Slip caught', hint: 'opened it, stopped within a minute' },
@@ -32,7 +31,6 @@ export function PhoneControl({ value, onChange, readOnly = false }: PhoneControl
           label={label}
           hint={hint}
           selected={value === state}
-          disabled={readOnly}
           onClick={() => onChange(value === state ? null : state)}
         />
       ))}

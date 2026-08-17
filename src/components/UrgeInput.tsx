@@ -1,7 +1,6 @@
 interface UrgeInputProps {
   value: number | null;
   onChange: (value: number | null) => void;
-  readOnly?: boolean;
 }
 
 /**
@@ -15,7 +14,7 @@ interface UrgeInputProps {
  * That is why the input is left uncontrolled-ish: an empty string maps to null, and
  * only a parseable number maps to a number.
  */
-export function UrgeInput({ value, onChange, readOnly = false }: UrgeInputProps) {
+export function UrgeInput({ value, onChange }: UrgeInputProps) {
   function handleChange(raw: string) {
     const trimmed = raw.trim();
     if (trimmed === '') {
@@ -43,10 +42,9 @@ export function UrgeInput({ value, onChange, readOnly = false }: UrgeInputProps)
           pattern="[0-9]*"
           autoComplete="off"
           value={value === null ? '' : String(value)}
-          disabled={readOnly}
           onChange={(e) => handleChange(e.target.value)}
           placeholder="—"
-          className="min-h-11 w-24 rounded-lg border border-line bg-paper px-3 py-2 text-center font-serif text-xl tabular-nums text-ink placeholder:text-faint disabled:opacity-60"
+          className="min-h-11 w-24 rounded-lg border border-line bg-paper px-3 py-2 text-center font-serif text-xl tabular-nums text-ink placeholder:text-faint"
         />
         {value === null && (
           <span className="text-xs text-faint">

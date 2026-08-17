@@ -273,8 +273,13 @@ export function exportAll(now: Date = new Date()): string {
  * Merge rather than replace, because a restore onto a device that has been used
  * since the export must not silently discard the newer entries. There is no sync
  * and no server-side copy; a clobbering import would be unrecoverable.
+ *
+ * `dryRun` counts without writing. The summary has to be shown *before* anything is
+ * committed (ARCHITECTURE.md §4), and the only honest way to produce those numbers
+ * is to run the same merge that will run for real — a second implementation of the
+ * rule living in the UI is a rule that can disagree with itself.
  */
-export function importAll(json: string): ImportResult {
+export function importAll(json: string, dryRun = false): ImportResult {
   const result: ImportResult = { added: 0, updated: 0, skipped: 0, ok: true };
 
   let doc: unknown;
@@ -297,10 +302,10 @@ export function importAll(json: string): ImportResult {
 
     const existing = getDay(date);
     if (!existing) {
-      writeDayRaw(incoming);
+      if (!dryRun) writeDayRaw(incoming);
       result.added++;
     } else if (incoming.updatedAt > existing.updatedAt) {
-      writeDayRaw(incoming);
+      if (!dryRun) writeDayRaw(incoming);
       result.updated++;
     } else {
       result.skipped++;
@@ -318,10 +323,10 @@ export function importAll(json: string): ImportResult {
 
       const existing = getReview(week);
       if (!existing) {
-        write(REVIEW + week, incoming);
+        if (!dryRun) write(REVIEW + week, incoming);
         result.added++;
       } else if (incoming.updatedAt > existing.updatedAt) {
-        write(REVIEW + week, incoming);
+        if (!dryRun) write(REVIEW + week, incoming);
         result.updated++;
       } else {
         result.skipped++;

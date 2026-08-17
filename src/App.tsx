@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import { settle } from './carry';
+import { ExportReminder } from './components/ExportReminder';
 import { addDays, diffDays, isSunday, monthOf, todayISO } from './dates';
 import { getMeta, getRange, saveMeta, writeDayRaw } from './storage';
 import type { ISODate, YearMonth } from './types';
 import { Month } from './views/Month';
+import { Settings } from './views/Settings';
 import { Today } from './views/Today';
 import { WeeklyReview } from './views/WeeklyReview';
 import { Year } from './views/Year';
@@ -47,7 +49,29 @@ function runSettlement(today: ISODate): void {
   saveMeta({ ...meta, lastSettledOn: today });
 }
 
-type View = 'today' | 'month' | 'year' | 'review';
+type View = 'today' | 'month' | 'year' | 'review' | 'settings';
+
+/** How long an export stays fresh before the banner mentions it. */
+const EXPORT_REMINDER_DAYS = 30;
+
+/**
+ * Whether to nag about exporting.
+ *
+ * Never having exported counts only once there is something to lose: a fresh install
+ * with no entries has no reason to be told about backups. "Something to lose" is
+ * read as recent use rather than a full scan — the case this protects against is a
+ * device that has been in daily use and never backed up.
+ */
+function exportOverdue(today: ISODate, now: Date): boolean {
+  const { lastExportAt } = getMeta();
+
+  if (!lastExportAt) {
+    return getRange(addDays(today, -EXPORT_REMINDER_DAYS), today).some(Boolean);
+  }
+
+  const age = (now.getTime() - new Date(lastExportAt).getTime()) / 86_400_000;
+  return age >= EXPORT_REMINDER_DAYS;
+}
 
 /**
  * No router: the views live behind component state.
@@ -82,6 +106,10 @@ export function App() {
   const [ym, setYm] = useState(() => monthOf(focused));
   const [year, setYear] = useState(() => Number(focused.slice(0, 4)));
 
+  // Dismissed for the session only. The risk it names — iOS clearing site data —
+  // has not gone away just because the banner was closed, so it returns next launch.
+  const [remindExport, setRemindExport] = useState(() => exportOverdue(focused, new Date()));
+
   // Without a router there is no navigation to reset the scroll position, so a tap
   // on a heatmap cell would otherwise land halfway down the day's entry.
   useEffect(() => {
@@ -105,7 +133,22 @@ export function App() {
 
   return (
     <>
-      {view === 'today' && <Today date={focused} onOpenMonth={openMonth} />}
+      {view === 'today' && (
+        <>
+          {remindExport && (
+            <div className="mx-auto w-full max-w-lg px-5 pt-8">
+              <ExportReminder
+                onOpenSettings={() => {
+                  setRemindExport(false);
+                  setView('settings');
+                }}
+                onDismiss={() => setRemindExport(false)}
+              />
+            </div>
+          )}
+          <Today date={focused} onOpenMonth={openMonth} />
+        </>
+      )}
 
       {view === 'month' && (
         <Month
@@ -117,8 +160,11 @@ export function App() {
             setYear(Number(ym.slice(0, 4)));
             setView('year');
           }}
+          onOpenSettings={() => setView('settings')}
         />
       )}
+
+      {view === 'settings' && <Settings onBack={() => setView('month')} />}
 
       {view === 'year' && (
         <Year

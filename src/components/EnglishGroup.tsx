@@ -3,7 +3,6 @@ import type { EnglishState } from '../types';
 interface EnglishGroupProps {
   value: EnglishState;
   onChange: (next: EnglishState) => void;
-  readOnly?: boolean;
 }
 
 const CHECKS: { key: keyof EnglishState; label: string }[] = [
@@ -20,7 +19,7 @@ const CHECKS: { key: keyof EnglishState; label: string }[] = [
  * Today.tsx for exactly that reason — its position on the page is the only thing
  * telling the user it does not count.
  */
-export function EnglishGroup({ value, onChange, readOnly = false }: EnglishGroupProps) {
+export function EnglishGroup({ value, onChange }: EnglishGroupProps) {
   const done = CHECKS.filter(({ key }) => value[key]).length;
 
   return (
@@ -34,12 +33,11 @@ export function EnglishGroup({ value, onChange, readOnly = false }: EnglishGroup
         {CHECKS.map(({ key, label }) => (
           <label
             key={key}
-            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-fill has-disabled:cursor-default"
+            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-fill"
           >
             <input
               type="checkbox"
               checked={value[key]}
-              disabled={readOnly}
               onChange={(e) => onChange({ ...value, [key]: e.target.checked })}
               className="size-5 shrink-0 accent-ink"
             />

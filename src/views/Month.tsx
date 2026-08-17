@@ -19,6 +19,7 @@ interface MonthProps {
   onSelectDay: (date: ISODate) => void;
   onToday: () => void;
   onOpenYear: () => void;
+  onOpenSettings: () => void;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -42,7 +43,14 @@ function percent(rate: number | null): string {
  * the per-item bars next because they are the actual diagnosis, then the urge trend.
  * English sits below a divider at the end — tracked, never part of a grade.
  */
-export function Month({ ym, onChangeMonth, onSelectDay, onToday, onOpenYear }: MonthProps) {
+export function Month({
+  ym,
+  onChangeMonth,
+  onSelectDay,
+  onToday,
+  onOpenYear,
+  onOpenSettings,
+}: MonthProps) {
   const dates = monthDates(ym);
   const days = getMonth(ym);
 
@@ -151,13 +159,20 @@ export function Month({ ym, onChangeMonth, onSelectDay, onToday, onOpenYear }: M
 
       {/* The year is reachable from here and nowhere else. It is the outer limit of
           history, not a second home screen (IMPLEMENTATION_PHASES.md, phase 7). */}
-      <div className="mt-10 flex justify-center">
+      <div className="mt-10 flex justify-center gap-6">
         <button
           type="button"
           onClick={onOpenYear}
           className="min-h-11 text-sm text-muted underline underline-offset-4"
         >
           The year
+        </button>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className="min-h-11 text-sm text-muted underline underline-offset-4"
+        >
+          Settings
         </button>
       </div>
     </div>
