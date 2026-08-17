@@ -135,17 +135,56 @@ export function settle(days: (DayEntry | null)[], today: ISODate, now: Date): Da
   return changed;
 }
 
+export interface CarriedIn {
+  item: DoingItemId;
+  /** The day it was carried from — the day a completion writes back to. */
+  from: ISODate;
+  done: boolean;
+}
+
 /**
  * Items carried into `date` from the day before.
  *
  * Derived by reading the previous day rather than stored on the receiving day: one
  * fact, one record. Writing it to both days means two records that can disagree
  * after an import or a partial write (ARCHITECTURE.md §3).
+ *
+ * Completed carries stay in the list, flagged `done`, so the receiving day can show
+ * the tap registered. `expired` is excluded and cannot appear anyway: expiry needs
+ * `dueOn < today`, so nothing due on `date` is expired yet.
  */
-export function carriedInto(previous: DayEntry | null, date: ISODate): DoingItemId[] {
+export function carriedInto(previous: DayEntry | null, date: ISODate): CarriedIn[] {
   if (!previous) return [];
-  return (['systemDesign', 'coding', 'office'] as const).filter((item) => {
+
+  const out: CarriedIn[] = [];
+  for (const item of ['systemDesign', 'coding', 'office'] as const) {
     const state = previous[item];
-    return state.status === 'carried' && state.dueOn === date;
-  });
+    if (state.dueOn !== date) continue;
+    if (state.status !== 'carried' && state.status !== 'done') continue;
+    out.push({ item, from: previous.date, done: state.status === 'done' });
+  }
+  return out;
+}
+
+/**
+ * Completes (or un-completes) a carried item on the day it was carried *from*.
+ *
+ * The carry buys back yesterday's grade; it does not discharge today's work, so the
+ * receiving day's own instance of the item is untouched and the write lands on the
+ * origin (ARCHITECTURE.md §3). Returns a new entry; the input is not mutated.
+ *
+ * `dueOn` is kept when done, because it is what identifies this as a landed carry on
+ * the receiving day — dropping it would make the row vanish mid-tap.
+ */
+export function completeCarried(
+  item: DoingItemId,
+  origin: DayEntry,
+  done: boolean,
+  now: Date,
+): DayEntry {
+  return {
+    ...origin,
+    [item]: { ...origin[item], status: done ? 'done' : 'carried' },
+    updatedAt: now.toISOString(),
+  };
 }
