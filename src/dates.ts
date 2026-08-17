@@ -66,6 +66,16 @@ export function monthOf(date: ISODate): YearMonth {
   return date.slice(0, 7);
 }
 
+/** Steps a year-month by `n` months. Rolls the year over in both directions. */
+export function shiftMonth(ym: YearMonth, n: number): YearMonth {
+  const [y, m] = ym.split('-').map(Number);
+  if (y === undefined || m === undefined) throw new Error(`not a year-month: ${ym}`);
+  // Day 1 rather than the current day: stepping from the 31st would otherwise skid
+  // into the month after a short one.
+  const d = new Date(y, m - 1 + n, 1);
+  return `${pad(d.getFullYear(), 4)}-${pad(d.getMonth() + 1)}`;
+}
+
 /** Every date in the month, in order. */
 export function monthDates(ym: YearMonth): ISODate[] {
   const n = daysInMonth(ym);
