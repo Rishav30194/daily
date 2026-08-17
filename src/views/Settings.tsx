@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 
 import { todayISO } from '../dates';
+import { settleFrom } from '../settlement';
 import {
   type ImportResult,
   exportAll,
@@ -8,8 +9,10 @@ import {
   importAll,
   markExported,
 } from '../storage';
+import type { ISODate } from '../types';
 
 interface SettingsProps {
+  today: ISODate;
   onBack: () => void;
 }
 
@@ -43,7 +46,7 @@ function summarise(r: ImportResult): string {
  * written — a restore onto a device that has been used since the export is the case
  * that has to not go wrong (ARCHITECTURE.md §4).
  */
-export function Settings({ onBack }: SettingsProps) {
+export function Settings({ today, onBack }: SettingsProps) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -56,12 +59,22 @@ export function Settings({ onBack }: SettingsProps) {
     const a = document.createElement('a');
     a.href = url;
     a.download = `daily-${todayISO()}.json`;
+    // In the document and revoked later, not immediately: Safari needs the anchor to
+    // be a real node, and revoking on the next line can cancel the transfer before
+    // the file is written. A stamped `lastExportAt` silences the backup reminder for
+    // 30 days, so it must not be stamped for an export that never landed.
+    a.style.display = 'none';
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+
+    setTimeout(() => {
+      a.remove();
+      URL.revokeObjectURL(url);
+    }, 30_000);
 
     markExported();
     setLastExport(getMeta().lastExportAt);
-    setMessage('Exported.');
+    setMessage('Exported. Check your files — if nothing was saved, export again before relying on it.');
   }
 
   async function choose(file: File) {
@@ -81,6 +94,12 @@ export function Settings({ onBack }: SettingsProps) {
   function commit() {
     if (!pending) return;
     const result = importAll(pending.json);
+
+    // A restored backup can hold carries that fell due months ago. Startup settlement
+    // only looks back 14 days, so without this they would sit as passes for ever and
+    // "expiry is automatic and retroactive" would quietly stop being true.
+    if (result.oldestDay) settleFrom(result.oldestDay, today);
+
     setPending(null);
     setMessage(`Imported. ${summarise(result)}.`);
   }

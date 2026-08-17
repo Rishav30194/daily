@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Heatmap } from '../components/Heatmap';
 import { addDays, parseISO, rangeDates, weekKey, weekRange, weekStart } from '../dates';
 import { gradeDay, mostMissed } from '../grading';
-import { StorageFullError, getAllReviews, getRange, getReview, saveReview } from '../storage';
+import { StorageWriteError, getAllReviews, getRange, getReview, saveReview } from '../storage';
 import { ITEM_LABELS, type ISODate } from '../types';
 
 interface WeeklyReviewProps {
@@ -54,10 +54,27 @@ export function WeeklyReview({ today, onOpenToday }: WeeklyReviewProps) {
       saved.current = change;
       setStorageError(null);
     } catch (err) {
-      if (err instanceof StorageFullError) setStorageError(err.message);
+      if (err instanceof StorageWriteError) setStorageError(err.message);
       else throw err;
     }
   }
+
+  // Blur covers the "Today's entry" link, but not the app being swiped away
+  // mid-sentence — on iOS a backgrounded PWA can be discarded without ever firing
+  // blur, and this field holds the week's one answer.
+  const latest = useRef(save);
+  latest.current = save;
+
+  useEffect(() => {
+    const flush = () => latest.current();
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', flush);
+      flush(); // and once more on unmount, for the view switch
+    };
+  }, []);
 
   const days = getRange(from, to);
   const worst = mostMissed(days);

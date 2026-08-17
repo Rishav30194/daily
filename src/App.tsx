@@ -1,53 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
-import { settle } from './carry';
 import { ExportReminder } from './components/ExportReminder';
-import { addDays, diffDays, isSunday, monthOf, todayISO } from './dates';
-import { getMeta, getRange, saveMeta, writeDayRaw } from './storage';
+import { addDays, isSunday, monthOf, todayISO } from './dates';
+import { runSettlement } from './settlement';
+import { getMeta, getRange } from './storage';
 import type { ISODate, YearMonth } from './types';
 import { Month } from './views/Month';
 import { Settings } from './views/Settings';
 import { Today } from './views/Today';
 import { WeeklyReview } from './views/WeeklyReview';
 import { Year } from './views/Year';
-
-/** How far back a first run looks for outstanding carries. Nothing older can still
- *  be due: a carry lives one day. */
-const FIRST_RUN_LOOKBACK = 14;
-
-/**
- * Expires carries whose day has passed, once per app open.
- *
- * Lazy rather than scheduled (ARCHITECTURE.md §1, q2): there is no background
- * process and no timer, so a day's colour can change between two openings. That is
- * expected — the user opens the app and yesterday is already red.
- *
- * Nothing here announces itself. No toast, no prompt, no undo. An interaction to
- * acknowledge expiry is an interaction that can be gamed (SPEC.md §4).
- *
- * Writes through `writeDayRaw` rather than `saveDay` so the timestamp `settle` chose
- * survives: `saveDay` re-stamps on write, and settlement's own stamp is the one that
- * an import merge should compare. It ignores the 7-day edit lock by design
- * (ARCHITECTURE.md §1, q7).
- */
-function runSettlement(today: ISODate): void {
-  const meta = getMeta();
-  const firstRun = addDays(today, -FIRST_RUN_LOOKBACK);
-  // A 14-day floor rather than trusting `lastSettledOn` exactly. It costs at most
-  // fourteen reads, and it means a clock change or a partial import cannot leave a
-  // carry outstanding for good.
-  const from =
-    meta.lastSettledOn && diffDays(firstRun, meta.lastSettledOn) < 0
-      ? meta.lastSettledOn
-      : firstRun;
-
-  for (const changed of settle(getRange(from, today), today, new Date())) {
-    writeDayRaw(changed);
-  }
-
-  saveMeta({ ...meta, lastSettledOn: today });
-}
 
 type View = 'today' | 'month' | 'year' | 'review' | 'settings';
 
@@ -109,6 +72,7 @@ export function App() {
   // Dismissed for the session only. The risk it names — iOS clearing site data —
   // has not gone away just because the banner was closed, so it returns next launch.
   const [remindExport, setRemindExport] = useState(() => exportOverdue(focused, new Date()));
+  const [settingsOrigin, setSettingsOrigin] = useState<View>('month');
 
   // Without a router there is no navigation to reset the scroll position, so a tap
   // on a heatmap cell would otherwise land halfway down the day's entry.
@@ -131,6 +95,11 @@ export function App() {
     setView('month');
   }
 
+  function openSettings(from: View) {
+    setSettingsOrigin(from);
+    setView('settings');
+  }
+
   return (
     <>
       {view === 'today' && (
@@ -140,7 +109,7 @@ export function App() {
               <ExportReminder
                 onOpenSettings={() => {
                   setRemindExport(false);
-                  setView('settings');
+                  openSettings('today');
                 }}
                 onDismiss={() => setRemindExport(false)}
               />
@@ -160,11 +129,16 @@ export function App() {
             setYear(Number(ym.slice(0, 4)));
             setView('year');
           }}
-          onOpenSettings={() => setView('settings')}
+          onOpenSettings={() => openSettings('month')}
         />
       )}
 
-      {view === 'settings' && <Settings onBack={() => setView('month')} />}
+      {/* Back returns where you came from. Settings is reachable from Month and from
+          the export banner on Today, and with no browser history there is nothing
+          else to carry that. */}
+      {view === 'settings' && (
+        <Settings today={focused} onBack={() => setView(settingsOrigin)} />
+      )}
 
       {view === 'year' && (
         <Year
