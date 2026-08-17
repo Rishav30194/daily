@@ -203,17 +203,24 @@ importAll(json: string): ImportResult
 Extended, per CLAUDE.md's "extend only with a clear reason":
 
 ```ts
-getReview(week: ISOWeek): WeeklyReview | null   // weekly review has its own record shape;
-saveReview(week: ISOWeek, r: WeeklyReview): void//   it is not a DayEntry and cannot use saveDay
-getRange(from: ISODate, to: ISODate): DayEntry[]// carry needs a 7-day window that straddles
-                                                //   month boundaries; getMonth cannot express it
-getMeta(): Meta / saveMeta(m: Meta): void       // export-reminder + settlement bookkeeping
+getReview(week) / saveReview(week, r)      // a review is not a DayEntry and cannot use saveDay
+getAllReviews(): WeeklyReview[]            // review history, newest week first
+getRange(from, to): (DayEntry | null)[]    // a 7-day window that straddles month boundaries
+getMeta() / saveMeta(m)                    // export-reminder + settlement bookkeeping
+markExported(now): void                    // drives the monthly reminder banner
+writeDayRaw(entry): void                   // write without re-stamping updatedAt
 ```
 
-`getRange` is the one that earns its place: the rolling carry window and the weekly review both
-need "the last N days" and both routinely cross a month boundary, which `getMonth` cannot answer
-without the caller stitching two months together — exactly the kind of logic that must not live in
-a component.
+`getRange` is the one that most earns its place: the rolling carry window and the weekly review
+both need "the last N days" and both routinely cross a month boundary, which `getMonth` cannot
+answer without the caller stitching two months together — exactly the kind of logic that must not
+live in a component. It returns a **nullable slot per date**, like `getMonth`, so results stay
+index-aligned with their dates; `urgeSeries` depends on that alignment.
+
+`writeDayRaw` exists because `saveDay` stamps `updatedAt` on every write, and two callers must
+not re-stamp: **import**, where the timestamp is the very thing being compared, and **settlement**,
+which is not a user edit. Keeping them as separate functions means the ordinary save path can
+never forget to stamp, and the two exceptions have to be deliberate.
 
 ### Reads, writes, and failure
 

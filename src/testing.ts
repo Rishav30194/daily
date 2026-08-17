@@ -34,3 +34,56 @@ export function withStatus(status: ItemStatus, dueOn?: string) {
 }
 
 export const phones: PhoneState[] = ['clean', 'slip', 'lost'];
+
+/**
+ * Minimal in-memory `localStorage`, installed on globalThis by the storage tests.
+ *
+ * Injecting a backend into storage.ts would be an abstraction with exactly one real
+ * implementation, so the tests supply the global instead.
+ */
+export class MemoryStorage implements Storage {
+  private map = new Map<string, string>();
+  /** Set to throw on the next write, to exercise the quota path. */
+  failNextWrite: 'quota' | null = null;
+
+  get length(): number {
+    return this.map.size;
+  }
+
+  key(i: number): string | null {
+    return [...this.map.keys()][i] ?? null;
+  }
+
+  getItem(k: string): string | null {
+    return this.map.get(k) ?? null;
+  }
+
+  setItem(k: string, v: string): void {
+    if (this.failNextWrite === 'quota') {
+      this.failNextWrite = null;
+      const err = new Error('quota');
+      err.name = 'QuotaExceededError';
+      throw err;
+    }
+    this.map.set(k, v);
+  }
+
+  removeItem(k: string): void {
+    this.map.delete(k);
+  }
+
+  clear(): void {
+    this.map.clear();
+  }
+}
+
+/** Installs a fresh store and returns it. */
+export function installStorage(): MemoryStorage {
+  const store = new MemoryStorage();
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: store,
+    configurable: true,
+    writable: true,
+  });
+  return store;
+}
