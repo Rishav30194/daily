@@ -135,8 +135,8 @@ export function Month({
             ))}
           </div>
 
-          {/* If 3:00 is winning over a month, 11:00 is not a real slot and should be
-              moved rather than defended (SPEC.md §2.1). */}
+          {/* If 3:00 is winning over a month, 11:00 is not a real slot, and moving
+              it beats defending it (SPEC.md §2.1). */}
           <p className="mt-4 font-serif text-sm tabular-nums text-muted">
             System design at 11:00 — {slots['11:00']} · at 3:00 — {slots['15:00']}
           </p>

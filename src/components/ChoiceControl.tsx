@@ -7,7 +7,7 @@ interface ChoiceControlProps {
 }
 
 /**
- * Coding or Claude certification — one or the other per day, his choice, and the app
+ * Coding or Claude certification — one or the other per day, your choice, and the app
  * records which (SPEC.md §2.1).
  *
  * Unlike the system-design slots these two are genuine equals: neither is a fallback,

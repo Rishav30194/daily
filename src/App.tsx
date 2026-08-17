@@ -77,8 +77,8 @@ export function App() {
   const [ym, setYm] = useState(() => monthOf(focused));
   const [year, setYear] = useState(() => Number(focused.slice(0, 4)));
 
-  // Dismissed for the session only. The risk it names — iOS clearing site data —
-  // has not gone away just because the banner was closed, so it returns next launch.
+  // Dismissed for the session only. Closing the banner does not remove the risk it
+  // names — iOS clearing site data — so it returns next launch.
   const [remindExport, setRemindExport] = useState(() => exportOverdue(focused, new Date()));
   const [settingsOrigin, setSettingsOrigin] = useState<View>('month');
 

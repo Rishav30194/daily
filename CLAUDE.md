@@ -16,8 +16,9 @@ does not repeat them.
 Read the ones relevant to the task, then only the source files the task needs. Do not scan the
 repo.
 
-**Current state: documentation complete, no code yet.** Phase 0 in `IMPLEMENTATION_PHASES.md` is
-the next thing.
+**Current state: built and deployed.** All ten phases in `IMPLEMENTATION_PHASES.md` are merged,
+the app is live on GitHub Pages, and the suite covers the pure modules, storage, and the view
+wiring. Treat that file as the record of what each part has to keep doing, not as a queue.
 
 ---
 

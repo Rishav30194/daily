@@ -111,8 +111,8 @@ export function weekRange(date: ISODate): { from: ISODate; to: ISODate } {
  *
  * Delegated to date-fns rather than hand-rolled: the ISO year is not the calendar
  * year at the boundaries — 2027-01-01 is 2026-W53 and 2024-12-30 is 2025-W01 — and
- * this is the one calculation here whose edge cases are easy to get confidently
- * wrong.
+ * this is the one calculation here whose edge cases are subtle enough to get
+ * confidently wrong.
  */
 export function weekKey(date: ISODate): ISOWeek {
   const d = parseISO(date);
@@ -125,7 +125,8 @@ export function weekKey(date: ISODate): ISOWeek {
  * Needed because a review is stored under its week and nothing else, so rendering
  * the history as anything friendlier than '2026-W33' means recovering the dates.
  * Delegated to date-fns for the same reason `weekKey` is: '2026-W53' is a real week
- * that starts on 2026-12-28, and the boundaries are easy to get confidently wrong.
+ * that starts on 2026-12-28, and the boundaries are subtle enough to get
+ * confidently wrong.
  */
 export function weekStart(week: ISOWeek): ISODate {
   const monday = parseDateFnsISO(`${week}-1`);

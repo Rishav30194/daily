@@ -4,8 +4,8 @@
   Tailwind v4 is configured here, not in a tailwind.config.js.
 
   A logbook, not a dashboard. The palette is a single warm neutral ramp: green,
-  amber and red are the only saturated colours in the app and they arrive in phase 5,
-  used only by the heatmap. Nothing here may introduce a fourth hue.
+  amber and red are the only saturated colours in the app, and only the heatmap
+  uses them. Nothing here may introduce a fourth hue.
 
   The type pairing is a serif for dates and figures against the system sans for
   controls. Both resolve to fonts already on the device — iOS has New York and SF —
@@ -42,7 +42,7 @@
     --color-line: #292524;
     --color-fill: #262322;
 
-    /* Lifted, not just inverted: the same hues need more luminance to stay apart
+    /* Lifted, not merely inverted: the same hues need more luminance to stay apart
        from each other against a near-black cell. */
     --color-green: #74a86b;
     --color-amber: #d3a147;

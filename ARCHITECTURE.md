@@ -19,9 +19,9 @@ the original brief; the answers live here.
 | 2 | Carry expiry trigger | **Lazy, on app open.** A settlement pass runs once per session at startup. A day's colour can change between two openings; this is expected and correct. No background process, no timers. |
 | 3 | Rolling 7-day carry window | **The 7 calendar days ending today, inclusive**, anchored on the date the carry is *created*. Carrying on 2026-08-17 counts carries created 2026-08-11 through 2026-08-17. |
 | 4 | Sunday path to its own entry | **Review first, entry below.** Sunday opens on the weekly review with a persistent, always-visible link to today's entry. One tap, no state lost, and the review cannot be silently skipped. |
-| 5 | Year overview | **In scope. Heatmap only.** 365/366 cells, green/amber/red/blank, click a month to open that month's view. No new aggregation — it reuses grades already computed. Nothing else on the screen. |
+| 5 | Year overview | **In scope. Heatmap only.** 365 or 366 cells, green, amber, red or blank, click a month to open that month's view. No new aggregation — it reuses grades already computed. Nothing else on the screen. |
 | 6 | Day boundary | **Local midnight.** `new Date()` in the device's timezone. No timezone handling, no UTC normalisation, no DST logic. |
-| 7 | Edit lock vs. expiry | **The 7-day lock applies to user edits only.** System-driven carry expiry writes to days of any age. The lock is a UI-level guard, not a storage-level one; `storage.saveDay` never refuses a write. |
+| 7 | Edit lock versus expiry | **The 7-day lock applies to user edits only.** System-driven carry expiry writes to days of any age. The lock is a UI-level guard, not a storage-level one; `storage.saveDay` never refuses a write. |
 | 8 | English and carry | **English cannot be carried.** Recorded for completeness; no code required. |
 
 ---
@@ -49,7 +49,7 @@ daily/
       Month.tsx
       Year.tsx
       WeeklyReview.tsx
-      Settings.tsx        export / import
+      Settings.tsx        export and import
     components/
       PhoneControl.tsx    three states, never a checkbox
       SlotControl.tsx     11:00 primary, 3:00 visually subordinate
@@ -82,8 +82,8 @@ types.ts ──┤                 ├──> views/ ──> components/
 - Views own state and effects. Components are presentational and take props.
 
 The reason for the split is that every load-bearing rule in SPEC.md — grading, carry limits,
-expiry, day shape — is testable without rendering anything. If a rule can only be verified by
-clicking, it will eventually be broken by a refactor.
+expiry, day shape — is testable without rendering anything. A rule that can only be verified by
+clicking is a rule some refactor eventually breaks.
 
 ---
 
@@ -139,7 +139,7 @@ export interface DayEntry {
   coding: CodingState;
   office: ItemState;                // ignored entirely on weekends
   english: EnglishState;
-  urges: number | null;             // null = deliberately blank, NOT zero
+  urges: number | null;             // null = deliberately blank, never zero
   note: string;                     // '' when unused
   updatedAt: string;                // ISO timestamp, for import conflict resolution
 }
@@ -233,7 +233,7 @@ never forget to stamp, and the two exceptions have to be deliberate.
 - `schema: 1` is stamped on every record. A future migration reads the field and rewrites; there
   is no migration code today, only the field to hang one on.
 
-### Export / import
+### Export and import
 
 - `exportAll()` returns every key under `daily:v1:` as one JSON document with a `schema` and an
   `exportedAt`.
@@ -257,13 +257,14 @@ gradeDay(entry: DayEntry | null): Grade | null
 
 - Returns `null` when there is no entry at all — a blank heatmap cell. Future dates are always
   `null`.
-- **Core four only:** phone, system design, coding/cert, office target. English is never an input.
+- **Core four only:** phone, system design, coding or cert, office target. English is never an
+  input.
 - A pass is: phone `clean` or `slip`; a doing item with status `done` or `carried`.
 - `carried` counting as a provisional pass is what makes expiry a *retroactive downgrade* rather
   than a no-op. `expired` and `missed` are both failures. `pending` is a failure.
-- Weekdays (Mon–Fri): 4 items. `green` = 4, `amber` = 3, `red` ≤ 2.
-- Weekends (Sat–Sun): office target is dropped entirely — not counted, not shown as failed, not
-  rendered. 3 items. `green` = 3, `amber` = 2, `red` ≤ 1.
+- Weekdays (Monday to Friday): 4 items. `green` = 4, `amber` = 3, `red` ≤ 2.
+- Weekends (Saturday and Sunday): office target is dropped entirely — not counted, not shown as
+  failed, not rendered. 3 items. `green` = 3, `amber` = 2, `red` ≤ 1.
 
 No weights, no partial credit, no fourth grade, no configuration.
 
@@ -271,7 +272,7 @@ Also in `grading.ts`, because they are the same pure-aggregation shape:
 
 ```ts
 itemRates(days)   // per-item completion rate for the month view
-slotSplit(days)   // 11:00 vs 3:00 count for system design
+slotSplit(days)   // 11:00 versus 3:00 count for system design
 englishRate(days) // sub-checks completed / sub-checks applicable
 urgeSeries(days)  // (ISODate, number | null)[] plus a 7-day trailing average that skips nulls
 gradeCounts(days) // green / amber / red totals and % green
@@ -499,8 +500,8 @@ live there too.
 - Delete code rather than commenting it out. No `TODO` comments — do it, or write it into
   `IMPLEMENTATION_PHASES.md`.
 - Runtime dependencies are SPEC.md §9's list plus **`date-fns`**, which is used for exactly one
-  thing: `weekKey`'s ISO week-year calculation in `dates.ts`. The boundaries there are genuinely
-  easy to get confidently wrong (2027-01-01 is 2026-W53), and a hand-rolled version is only as
+  thing: `weekKey`'s ISO week-year calculation in `dates.ts`. The boundaries there are subtle
+  enough to get confidently wrong (2027-01-01 is 2026-W53), and a hand-rolled version is only as
   correct as the author's understanding of the spec. The rest of `dates.ts` stays hand-rolled.
 - **No chart library.** Considered and declined on balance, not on size — the two charts are a
   line with gaps and four bars, roughly forty lines of SVG, and hand-rolling keeps exact control
@@ -511,14 +512,14 @@ live there too.
 **TypeScript**
 
 - `strict: true` plus `noUncheckedIndexedAccess` — `getMonth` returns a sparse array and the
-  compiler should say so.
+  compiler must say so.
 - No `any`. No non-null `!` on anything read from storage; a parsed record is `unknown` until
   validated. `as` only to narrow validated `unknown`.
 - Union literals over enums and over booleans. `PhoneState` is three strings; a `wasClean` plus a
   `wasSlip` boolean is two bugs waiting to disagree.
 - Explicit return types on exported functions. Locals infer.
-- **Never `??` or `||` on `urges`** — every coalescing operator on that field destroys the
-  blank/zero distinction silently. Test for `null` explicitly.
+- **Never `??` or `||` on `urges`** — every coalescing operator on that field silently destroys
+  the distinction between blank and zero. Test for `null` explicitly.
 - Dates are `ISODate` strings everywhere except inside `dates.ts`. `Date` objects don't cross
   module boundaries — they carry a time and a timezone nothing else wants.
 

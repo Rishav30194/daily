@@ -113,7 +113,7 @@ export function Settings({ onBack }: SettingsProps) {
 
     // Taken from the preview, not the result, so it survives a write that fails
     // halfway: the days already written keep their carries either way, and those
-    // carries are older than settlement's 14-day floor will ever reach again.
+    // carries are older than settlement's 14-day floor ever reaches again.
     const oldest = pending.preview.oldestDay;
 
     let imported: ImportResult | null = null;
@@ -126,8 +126,8 @@ export function Settings({ onBack }: SettingsProps) {
     // Settled in its own step, whatever happened above. A restored backup can hold
     // carries that fell due months ago; without this they sit as passes for ever and
     // "expiry is automatic and retroactive" quietly stops being true. It runs even
-    // after a failed merge, because the days written before the failure are just as
-    // far out of settlement's 14-day reach.
+    // after a failed merge, because the days written before the failure are as far
+    // out of settlement's 14-day reach.
     if (oldest) {
       try {
         settleFrom(oldest, today);

@@ -21,7 +21,7 @@ export const FIRST_RUN_LOOKBACK = 14;
  *
  * Writes through `writeDayRaw` rather than `saveDay` so the timestamp `settle` chose
  * survives: `saveDay` re-stamps on write, and settlement's own stamp is the one an
- * import merge should compare. It ignores the 7-day edit lock by design
+ * import merge compares. It ignores the 7-day edit lock by design
  * (ARCHITECTURE.md §1, q7).
  *
  * Returns how many entries changed, for tests — nothing in the UI announces it. No

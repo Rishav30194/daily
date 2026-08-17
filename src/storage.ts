@@ -38,8 +38,8 @@ export class StorageFullError extends StorageWriteError {
 }
 
 /**
- * Storage exists but will not accept writes — private mode, blocked cookies, a
- * locked-down browser.
+ * Storage exists but refuses writes — private mode, blocked cookies, a locked-down
+ * browser.
  *
  * Reads already treat this as "nothing stored" rather than throwing. Writes have to
  * match: crashing the tree on the first tap is worse than saying plainly that
@@ -64,7 +64,7 @@ function read(key: string): unknown {
   try {
     return JSON.parse(raw);
   } catch {
-    // A malformed value reads as absent. A day that will not parse is a blank cell,
+    // A malformed value reads as absent. A day that does not parse is a blank cell,
     // never an error thrown into the UI.
     return null;
   }
@@ -154,7 +154,7 @@ function parseDay(v: unknown, date: ISODate): DayEntry | null {
     schema: SCHEMA,
     // The key an entry is filed under is the truth, never the `date` inside it. They
     // disagree only in a hand-edited or corrupt export, and trusting the record would
-    // let it overwrite a different day than the one the merge just compared.
+    // let it overwrite a different day than the one the merge compared.
     date,
     phone: phones.find((p) => p === v['phone']) ?? null,
     systemDesign: slot === undefined ? sd : { ...sd, slot },
@@ -384,8 +384,8 @@ export function exportAll(now: Date = new Date()): string {
  *
  * `dryRun` counts without writing. The summary has to be shown *before* anything is
  * committed (ARCHITECTURE.md §4), and the only honest way to produce those numbers
- * is to run the same merge that will run for real — a second implementation of the
- * rule living in the UI is a rule that can disagree with itself.
+ * is to run the same merge that runs for real — a second implementation of the rule
+ * living in the UI is a rule that can disagree with itself.
  */
 export function importAll(json: string, dryRun = false): ImportResult {
   const result: ImportResult = { added: 0, updated: 0, skipped: 0, ok: true, oldestDay: null };

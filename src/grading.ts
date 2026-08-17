@@ -138,7 +138,7 @@ export function itemRates(days: (DayEntry | null)[]): ItemRate[] {
 
 /**
  * 11:00 versus 3:00 for system design. If 3:00 is winning over a month, 11:00 is
- * not a real slot and should be moved rather than defended (SPEC.md §2.1).
+ * not a real slot, and moving it beats defending it (SPEC.md §2.1).
  */
 export function slotSplit(days: (DayEntry | null)[]): Record<Slot, number> {
   const split: Record<Slot, number> = { '11:00': 0, '15:00': 0 };
@@ -190,8 +190,8 @@ export function urgeSeries(days: (DayEntry | null)[], dates: ISODate[]): UrgePoi
     throw new Error('urgeSeries: days and dates must be index-aligned');
   }
 
-  // Note the explicit null test rather than `?? null`: `??` would be correct here
-  // but reads as a coalesce on `urges`, which is exactly the bug this field invites.
+  // An explicit null test rather than `?? null`: `??` is correct here but reads as
+  // a coalesce on `urges`, which is exactly the bug this field invites.
   const counts: (number | null)[] = days.map((day) =>
     day && day.urges !== null ? day.urges : null,
   );

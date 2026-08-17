@@ -75,7 +75,7 @@ export interface DayEntry {
   /** Ignored entirely on weekends — not counted, not shown as failed. */
   office: ItemState;
   english: EnglishState;
-  /** null = deliberately blank, which is NOT zero. Blank means "not recorded";
+  /** null = deliberately blank, which is *not* zero. Blank means "not recorded";
    *  zero means "recorded, and it was zero" — a genuinely good day. Never coalesce. */
   urges: number | null;
   note: string;

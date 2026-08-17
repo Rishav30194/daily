@@ -11,7 +11,7 @@ interface HeatmapProps {
   cells: HeatmapCell[];
   /** Empty slots before the first cell, so the 1st lands under its weekday. */
   leadingBlanks: number;
-  /** `year` is the twelve-per-page size phase 7 needs. */
+  /** `year` is the twelve-per-page size the year overview renders at. */
   size?: 'month' | 'year';
   /** The day to outline — normally today. */
   marked?: ISODate;

@@ -59,8 +59,8 @@ export function carriesInWindow(window: (DayEntry | null)[], today: ISODate): nu
  * attempt while an absent one closes the question (SPEC.md §4). A full window keeps
  * the control visible but disabled, so the limit is legible rather than mysterious.
  *
- * Note the type: `DoingItemId` excludes phone, so "the phone can never be carried"
- * is unrepresentable here rather than guarded at runtime.
+ * The type carries a rule: `DoingItemId` excludes phone, so "the phone can never be
+ * carried" is unrepresentable here rather than guarded at runtime.
  */
 export function canCarry(
   item: DoingItemId,
