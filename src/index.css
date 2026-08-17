@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+/* Tailwind v4 is configured here, not in a tailwind.config.js.
+   Grade colours are deliberately absent: they arrive in phase 5 and are referenced
+   only from Heatmap.tsx. Everything else in the app stays neutral. */
+@theme {
+  --color-paper: #fafaf9;
+  --color-ink: #1c1917;
+}
+
+/* Transitions are removed under reduced motion, not shortened. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
