@@ -74,7 +74,7 @@ export function Settings({ today, onBack }: SettingsProps) {
 
     markExported();
     setLastExport(getMeta().lastExportAt);
-    setMessage('Exported. Check your files — if nothing was saved, export again before relying on it.');
+    setMessage('Exported.');
   }
 
   async function choose(file: File) {
