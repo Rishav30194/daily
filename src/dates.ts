@@ -1,4 +1,4 @@
-import { getISOWeek, getISOWeekYear } from 'date-fns';
+import { getISOWeek, getISOWeekYear, parseISO as parseDateFnsISO } from 'date-fns';
 
 import type { ISODate, ISOWeek, YearMonth } from './types';
 
@@ -56,6 +56,12 @@ export function isWeekend(date: ISODate): boolean {
   return day === 0 || day === 6;
 }
 
+/** Weeks end Sunday, and Sunday is when the app opens on the review instead of the
+ *  day view (ARCHITECTURE.md §7). */
+export function isSunday(date: ISODate): boolean {
+  return parseISO(date).getDay() === 0;
+}
+
 export function daysInMonth(ym: YearMonth): number {
   const [y, m] = ym.split('-').map(Number);
   if (y === undefined || m === undefined) throw new Error(`not a year-month: ${ym}`);
@@ -111,6 +117,20 @@ export function weekRange(date: ISODate): { from: ISODate; to: ISODate } {
 export function weekKey(date: ISODate): ISOWeek {
   const d = parseISO(date);
   return `${pad(getISOWeekYear(d), 4)}-W${pad(getISOWeek(d))}`;
+}
+
+/**
+ * The Monday a stored week key refers to — `weekKey` in reverse.
+ *
+ * Needed because a review is stored under its week and nothing else, so rendering
+ * the history as anything friendlier than '2026-W33' means recovering the dates.
+ * Delegated to date-fns for the same reason `weekKey` is: '2026-W53' is a real week
+ * that starts on 2026-12-28, and the boundaries are easy to get confidently wrong.
+ */
+export function weekStart(week: ISOWeek): ISODate {
+  const monday = parseDateFnsISO(`${week}-1`);
+  if (Number.isNaN(monday.getTime())) throw new Error(`not an ISO week: ${week}`);
+  return toISO(monday);
 }
 
 /**

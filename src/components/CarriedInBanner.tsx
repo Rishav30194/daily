@@ -1,18 +1,12 @@
 import type { CarriedIn } from '../carry';
 import { parseISO } from '../dates';
-import type { DoingItemId } from '../types';
+import { ITEM_LABELS, type DoingItemId } from '../types';
 import { OptionButton } from './OptionButton';
 
 interface CarriedInBannerProps {
   items: CarriedIn[];
   onToggle: (item: DoingItemId, done: boolean) => void;
 }
-
-const LABELS: Record<DoingItemId, string> = {
-  systemDesign: 'System design',
-  coding: 'Coding / certification',
-  office: 'Office target',
-};
 
 function shortDate(date: string): string {
   return parseISO(date).toLocaleDateString(undefined, {
@@ -53,7 +47,7 @@ export function CarriedInBanner({ items, onToggle }: CarriedInBannerProps) {
         {items.map(({ item, done }) => (
           <OptionButton
             key={item}
-            label={LABELS[item]}
+            label={ITEM_LABELS[item]}
             hint={done ? 'done' : 'still owed'}
             selected={done}
             onClick={() => onToggle(item, !done)}

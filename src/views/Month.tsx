@@ -11,7 +11,7 @@ import {
   urgeSeries,
 } from '../grading';
 import { getMonth } from '../storage';
-import type { DoingItemId, ISODate, YearMonth } from '../types';
+import { ITEM_LABELS, type ISODate, type YearMonth } from '../types';
 
 interface MonthProps {
   ym: YearMonth;
@@ -19,13 +19,6 @@ interface MonthProps {
   onSelectDay: (date: ISODate) => void;
   onToday: () => void;
 }
-
-const ITEM_LABELS: Record<DoingItemId | 'phone', string> = {
-  phone: 'Phone',
-  systemDesign: 'System design',
-  coding: 'Coding / certification',
-  office: 'Office target',
-};
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 
 import { settle } from './carry';
-import { addDays, diffDays, monthOf, todayISO } from './dates';
+import { addDays, diffDays, isSunday, monthOf, todayISO } from './dates';
 import { getMeta, getRange, saveMeta, writeDayRaw } from './storage';
 import type { ISODate } from './types';
 import { Month } from './views/Month';
 import { Today } from './views/Today';
+import { WeeklyReview } from './views/WeeklyReview';
 
 /** How far back a first run looks for outstanding carries. Nothing older can still
  *  be due: a carry lives one day. */
@@ -45,7 +46,7 @@ function runSettlement(today: ISODate): void {
   saveMeta({ ...meta, lastSettledOn: today });
 }
 
-type View = 'today' | 'month';
+type View = 'today' | 'month' | 'review';
 
 /**
  * No router: the views live behind component state.
@@ -73,7 +74,10 @@ export function App() {
     return today;
   });
 
-  const [view, setView] = useState<View>('today');
+  // Sunday opens on the review, every other day on the entry. The review is not
+  // reachable from anywhere else: it arrives when the week is over, and it is not a
+  // screen to go and look at (ARCHITECTURE.md §7).
+  const [view, setView] = useState<View>(() => (isSunday(focused) ? 'review' : 'today'));
   const [ym, setYm] = useState(() => monthOf(focused));
 
   // Without a router there is no navigation to reset the scroll position, so a tap
@@ -94,15 +98,19 @@ export function App() {
 
   return (
     <>
-      {view === 'today' ? (
-        <Today date={focused} onOpenMonth={openMonth} />
-      ) : (
+      {view === 'today' && <Today date={focused} onOpenMonth={openMonth} />}
+
+      {view === 'month' && (
         <Month
           ym={ym}
           onChangeMonth={setYm}
           onSelectDay={openDay}
           onToday={() => openDay(todayISO())}
         />
+      )}
+
+      {view === 'review' && (
+        <WeeklyReview today={focused} onOpenToday={() => openDay(focused)} />
       )}
 
       {needRefresh && (

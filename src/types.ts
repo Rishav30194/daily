@@ -24,6 +24,21 @@ export type Grade = 'green' | 'amber' | 'red';
  *  can never be carried" is enforced by this type, not by a runtime check. */
 export type DoingItemId = 'systemDesign' | 'coding' | 'office';
 
+/**
+ * How each item is named wherever it is named — the month view, the carry banner,
+ * the weekly review's "Coding was missed 3 days this week."
+ *
+ * It lives next to the type that fixes the list because there is exactly one list
+ * and no UI for creating, renaming, hiding or reordering it. Three views naming the
+ * same item three ways is how that stops being true.
+ */
+export const ITEM_LABELS: Record<DoingItemId | 'phone', string> = {
+  phone: 'Phone',
+  systemDesign: 'System design',
+  coding: 'Coding / certification',
+  office: 'Office target',
+};
+
 export type ItemStatus =
   | 'pending'
   | 'done'
