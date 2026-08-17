@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { BinaryControl } from '../components/BinaryControl';
+import { CarriedInBanner } from '../components/CarriedInBanner';
+import { CarryControl } from '../components/CarryControl';
 import { ChoiceControl } from '../components/ChoiceControl';
 import { EnglishGroup } from '../components/EnglishGroup';
 import { PhoneControl } from '../components/PhoneControl';
 import { SlotControl } from '../components/SlotControl';
 import { UrgeInput } from '../components/UrgeInput';
+import { CARRY_WINDOW_DAYS, canCarry, carriedInto, carryItem, completeCarried } from '../carry';
+import { addDays, todayISO } from '../dates';
 import { appliesOn } from '../grading';
-import { StorageFullError, getDay, saveDay } from '../storage';
-import type { DayEntry, ISODate } from '../types';
+import { StorageFullError, getDay, getRange, saveDay } from '../storage';
+import type { DayEntry, DoingItemId, ISODate } from '../types';
 
 interface TodayProps {
   date: ISODate;
@@ -58,17 +62,21 @@ function Section({
  */
 export function Today({ date }: TodayProps) {
   const [entry, setEntry] = useState<DayEntry>(() => getDay(date) ?? blank(date));
+  // Held separately because the carry banner writes to it: completing a carried
+  // item lands on the day it came from, not on this one.
+  const [previous, setPrevious] = useState<DayEntry | null>(() => getDay(addDays(date, -1)));
   const [storageError, setStorageError] = useState<string | null>(null);
 
   useEffect(() => {
     setEntry(getDay(date) ?? blank(date));
+    setPrevious(getDay(addDays(date, -1)));
   }, [date]);
 
-  function update(patch: Partial<DayEntry>) {
-    const next = { ...entry, ...patch };
-    setEntry(next);
+  /** Every write in this view goes through here — there is exactly one place a full
+   *  disk can surface, and one message for it. */
+  function persist(target: ISODate, next: DayEntry): void {
     try {
-      saveDay(date, next);
+      saveDay(target, next);
       setStorageError(null);
     } catch (err) {
       // The only storage error the user ever sees, because the only remedy is
@@ -76,6 +84,49 @@ export function Today({ date }: TodayProps) {
       if (err instanceof StorageFullError) setStorageError(err.message);
       else throw err;
     }
+  }
+
+  function update(patch: Partial<DayEntry>) {
+    const next = { ...entry, ...patch };
+    setEntry(next);
+    persist(date, next);
+  }
+
+  const today = todayISO();
+  // Deferring is a decision about the day you are in. On any other date the control
+  // is absent: carrying from a day already gone is either an instant expiry or a
+  // retroactive rescue, and both are ways round "do it today or take the miss".
+  const isToday = date === today;
+
+  // Days older than yesterday cannot change while this view is open — settlement
+  // already ran, and nothing here writes that far back — so they are read once.
+  const older = useMemo(
+    () => getRange(addDays(date, -(CARRY_WINDOW_DAYS - 1)), addDays(date, -2)),
+    [date],
+  );
+  const carryWindow = [...older, previous, entry];
+
+  function carry(item: DoingItemId) {
+    const next = carryItem(item, entry, new Date());
+    setEntry(next);
+    persist(date, next);
+  }
+
+  function carryControl(item: DoingItemId) {
+    if (!isToday) return null;
+    return (
+      <CarryControl
+        verdict={canCarry(item, entry, carryWindow, today)}
+        onCarry={() => carry(item)}
+      />
+    );
+  }
+
+  function toggleCarriedIn(item: DoingItemId, done: boolean) {
+    if (!previous) return;
+    const next = completeCarried(item, previous, done, new Date());
+    setPrevious(next);
+    persist(next.date, next);
   }
 
   const { office: officeApplies } = appliesOn(date);
@@ -106,7 +157,14 @@ export function Today({ date }: TodayProps) {
         </p>
       )}
 
+      {/* Yesterday's debt sits above today's own work, because it is owed first. */}
+      {isToday && (
+        <CarriedInBanner items={carriedInto(previous, date)} onToggle={toggleCarriedIn} />
+      )}
+
       <div className="grid gap-7">
+        {/* No carry control here, ever: the phone item cannot be carried, which is
+            why it is not a DoingItemId (SPEC.md §4). */}
         <Section title="Phone">
           <PhoneControl value={entry.phone} onChange={(phone) => update({ phone })} />
         </Section>
@@ -116,10 +174,12 @@ export function Today({ date }: TodayProps) {
             value={entry.systemDesign}
             onChange={(systemDesign) => update({ systemDesign })}
           />
+          {carryControl('systemDesign')}
         </Section>
 
         <Section title="Coding / certification" note="45 min, one or the other">
           <ChoiceControl value={entry.coding} onChange={(coding) => update({ coding })} />
+          {carryControl('coding')}
         </Section>
 
         {/* Weekends drop the office target entirely — not rendered, not counted,
@@ -127,6 +187,7 @@ export function Today({ date }: TodayProps) {
         {officeApplies && (
           <Section title="Office target" note="did you finish what you set out to do">
             <BinaryControl value={entry.office} onChange={(office) => update({ office })} />
+            {carryControl('office')}
           </Section>
         )}
 

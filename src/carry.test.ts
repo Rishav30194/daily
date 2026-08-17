@@ -6,6 +6,7 @@ import {
   carriedInto,
   carriesInWindow,
   carryItem,
+  completeCarried,
   settle,
 } from './carry';
 import { addDays } from './dates';
@@ -214,7 +215,9 @@ describe('settle — the retroactive downgrade', () => {
 describe('carriedInto', () => {
   test('lists items carried in from the previous day', () => {
     const previous = carried('2026-08-17', 'coding'); // due 2026-08-18
-    expect(carriedInto(previous, '2026-08-18')).toEqual(['coding']);
+    expect(carriedInto(previous, '2026-08-18')).toEqual([
+      { item: 'coding', from: '2026-08-17', done: false },
+    ]);
   });
 
   test('ignores a carry due on another day', () => {
@@ -229,7 +232,89 @@ describe('carriedInto', () => {
     expect(carriedInto(previous, '2026-08-18')).toEqual([]);
   });
 
+  test('keeps a completed carry in the list, flagged done', () => {
+    // Otherwise the row vanishes the moment it is ticked, and the tap reads as lost.
+    const previous = entry('2026-08-17', {
+      coding: { status: 'done', dueOn: '2026-08-18' },
+    });
+    expect(carriedInto(previous, '2026-08-18')).toEqual([
+      { item: 'coding', from: '2026-08-17', done: true },
+    ]);
+  });
+
+  test('ignores an item done on the previous day that was never carried', () => {
+    const previous = entry('2026-08-17', { coding: { status: 'done' } });
+    expect(carriedInto(previous, '2026-08-18')).toEqual([]);
+  });
+
+  test('lists several items carried into the same day', () => {
+    const previous = entry('2026-08-17', {
+      systemDesign: { status: 'carried', dueOn: '2026-08-18' },
+      office: { status: 'carried', dueOn: '2026-08-18' },
+    });
+    expect(carriedInto(previous, '2026-08-18').map((c) => c.item)).toEqual([
+      'systemDesign',
+      'office',
+    ]);
+  });
+
   test('no previous day means nothing carried in', () => {
     expect(carriedInto(null, '2026-08-18')).toEqual([]);
+  });
+});
+
+describe('completeCarried', () => {
+  const ORIGIN = '2026-08-16';
+
+  test('writes the completion to the origin day, keeping dueOn', () => {
+    const origin = carried(ORIGIN, 'coding'); // due 2026-08-17
+    const result = completeCarried('coding', origin, true, NOW);
+    expect(result.coding).toEqual({ status: 'done', dueOn: TODAY });
+  });
+
+  test('un-completing puts it back to carried', () => {
+    const origin = entry(ORIGIN, { coding: { status: 'done', dueOn: TODAY } });
+    const result = completeCarried('coding', origin, false, NOW);
+    expect(result.coding).toEqual({ status: 'carried', dueOn: TODAY });
+  });
+
+  test('does not touch the rest of the origin day', () => {
+    const origin = perfect(ORIGIN, { coding: { status: 'carried', dueOn: TODAY } });
+    const result = completeCarried('coding', origin, true, NOW);
+    expect(result.systemDesign).toEqual(origin.systemDesign);
+    expect(result.office).toEqual(origin.office);
+    expect(result.phone).toBe(origin.phone);
+  });
+
+  test('does not mutate the input', () => {
+    const origin = carried(ORIGIN, 'coding');
+    completeCarried('coding', origin, true, NOW);
+    expect(origin.coding.status).toBe('carried');
+  });
+
+  test('a landed carry survives settlement that would otherwise expire it', () => {
+    // The carry was due yesterday and completed then; settling today must leave it.
+    const origin = entry('2026-08-15', { coding: { status: 'carried', dueOn: '2026-08-16' } });
+    const done = completeCarried('coding', origin, true, NOW);
+    expect(settle([done], TODAY, NOW)).toEqual([]);
+  });
+
+  test('completing a carry restores the origin day from red to green', () => {
+    // 2026-08-13 is a Thursday, so all four core items apply.
+    const origin = perfect('2026-08-13', {
+      coding: { status: 'missed' },
+      office: { status: 'missed' },
+    });
+    expect(gradeDay(origin)).toBe('red');
+
+    const carriedDay = carryItem('coding', origin, NOW);
+    expect(gradeDay(carriedDay)).toBe('amber'); // provisional pass while outstanding
+
+    const settled = completeCarried('coding', carriedDay, true, NOW);
+    expect(gradeDay(settled)).toBe('amber'); // office is still a real miss
+
+    expect(gradeDay(completeCarried('office', carryItem('office', settled, NOW), true, NOW))).toBe(
+      'green',
+    );
   });
 });
