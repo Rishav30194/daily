@@ -12,21 +12,30 @@ export type ISOWeek = string;
  *  skill being trained, and grading it as failure turns one slip into a lost day. */
 export type PhoneState = 'clean' | 'slip' | 'lost';
 
-/** 11:00 is where system design is meant to happen; 15:00 exists only so an
- *  unpredictable workday doesn't force a miss. The app records which was used. */
-export type Slot = '11:00' | '15:00';
-
-export type CodeChoice = 'coding' | 'cert';
+/** 7:00 is where system design is meant to happen; 9:00 exists only so an
+ *  unpredictable evening doesn't force a miss. The app records which was used. */
+export type Slot = '19:00' | '21:00';
 
 export type Grade = 'green' | 'amber' | 'red';
 
-/** The three items that can be carried. Phone is deliberately absent: "the phone
- *  can never be carried" is enforced by this type, not by a runtime check. */
-export type DoingItemId = 'systemDesign' | 'coding' | 'office';
+/**
+ * The three study subjects. One of them is scheduled on a weekday and all three at
+ * the weekend (`schedule.ts`).
+ *
+ * `cert` is a slot rather than a particular certification: whichever one is in
+ * flight lives here, and passing one and starting the next is not a change to this
+ * app. Which certification it is belongs in a weekly review note, not in the data.
+ */
+export type StudyItemId = 'systemDesign' | 'cert' | 'lld';
+
+/** The items that can be carried — the study subjects plus the office target. Phone
+ *  is deliberately absent: "the phone can never be carried" is enforced by this type,
+ *  not by a runtime check. */
+export type DoingItemId = StudyItemId | 'office';
 
 /**
  * How each item is named wherever it is named — the month view, the carry banner,
- * the weekly review's "Coding was missed 3 days this week."
+ * the weekly review's "LLD was missed 3 days this week."
  *
  * It lives next to the type that fixes the list because there is exactly one list
  * and no UI for creating, renaming, hiding or reordering it. Three views naming the
@@ -35,7 +44,8 @@ export type DoingItemId = 'systemDesign' | 'coding' | 'office';
 export const ITEM_LABELS: Record<DoingItemId | 'phone', string> = {
   phone: 'Phone',
   systemDesign: 'System design',
-  coding: 'Coding / certification',
+  cert: 'Certification',
+  lld: 'LLD',
   office: 'Office target',
 };
 
@@ -56,10 +66,6 @@ export interface SystemDesignState extends ItemState {
   slot?: Slot;
 }
 
-export interface CodingState extends ItemState {
-  choice?: CodeChoice;
-}
-
 export interface EnglishState {
   standup: boolean;
   rewrite: boolean;
@@ -67,11 +73,14 @@ export interface EnglishState {
 }
 
 export interface DayEntry {
-  schema: 1;
+  schema: 2;
   date: ISODate;
   phone: PhoneState | null;
+  /** Present on every entry, scheduled or not. An item the day did not ask for is
+   *  never rendered and never graded, so it simply stays `pending`. */
   systemDesign: SystemDesignState;
-  coding: CodingState;
+  cert: ItemState;
+  lld: ItemState;
   /** Ignored entirely on weekends — not counted, not shown as failed. */
   office: ItemState;
   english: EnglishState;
@@ -89,7 +98,7 @@ export interface WeeklyReview {
 }
 
 export interface Meta {
-  schema: 1;
+  schema: 2;
   lastSettledOn: ISODate | null;
   lastExportAt: string | null;
 }

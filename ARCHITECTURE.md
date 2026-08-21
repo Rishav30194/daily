@@ -24,6 +24,19 @@ the original brief; the answers live here.
 | 7 | Edit lock versus expiry | **The 7-day lock applies to user edits only.** System-driven carry expiry writes to days of any age. The lock is a UI-level guard, not a storage-level one; `storage.saveDay` never refuses a write. |
 | 8 | English and carry | **English cannot be carried.** Recorded for completeness; no code required. |
 
+### Later decisions
+
+These are not from SPEC.md §12. They are changes to the brief, approved in advance, and they
+override SPEC.md where the two disagree.
+
+| # | Decision | Resolution |
+|---|---|---|
+| 9 | The study hour moved out of the workday | System design can no longer happen at work, so **the whole study hour is now an evening hour**: one hour on a weekday, three at the weekend. The two slots survive with new times — **7:00 default, 9:00 fallback** — and 9:00 stays visually subordinate for the same reason 3:00 PM did. |
+| 10 | Three subjects, one hour | An hour does not split across two subjects without ruining both, so **a weekday schedules exactly one subject** and the other two are absent from that day — not failed. `schedule.ts` is the fixed map: Mon, Tue, Thu certification; Wed system design; Fri LLD; both weekend days all three. Fixed in source, no UI, no per-day override. |
+| 11 | Grading follows the schedule | **Green = every item the day asked for, amber = one short, red = two or more.** A weekday is phone, the day's subject, the office target (3). A weekend is phone and all three subjects (4). This generalises the weekend rule SPEC.md §5 already stated; it is not a new one. Without it every weekday would grade amber and the colour would mean nothing. |
+| 12 | `coding` split into `cert` and `lld` | The old `coding` item carried a choice of coding-or-certification, and "coding" always meant LLD. They are now **separate items on different days**, so each has its own completion rate — the diagnostic the month view exists for. Schema 2; schema 1 entries migrate on read. |
+| 13 | The certification is a slot, not a course | `cert` holds **whichever certification is in flight**. Passing one and starting the next changes nothing here, so the schedule never moves and no history is ever re-graded. Which certification it is belongs in a weekly review note, not in the data. If the slot empties for good, that is a remodel, not a schedule edit. |
+
 ---
 
 ## 2. Module map
@@ -43,6 +56,7 @@ daily/
     grading.ts            pure — entry -> green | amber | red | null
     carry.ts              pure — eligibility, window counting, expiry settlement
     dates.ts              pure — ISO date keys, week ranges, weekday/weekend shape
+    schedule.ts           pure — which subjects a date asks for; fixed in source
     storage.ts            the only module that touches localStorage
     views/
       Today.tsx
@@ -52,9 +66,8 @@ daily/
       Settings.tsx        export and import
     components/
       PhoneControl.tsx    three states, never a checkbox
-      SlotControl.tsx     11:00 primary, 3:00 visually subordinate
-      ChoiceControl.tsx   coding vs cert
-      BinaryControl.tsx   office target
+      SlotControl.tsx     7:00 primary, 9:00 visually subordinate
+      BinaryControl.tsx   office target, certification, LLD
       EnglishGroup.tsx    three sub-checks, shown as n/3
       UrgeInput.tsx       blank is a real value
       CarryControl.tsx    hidden or disabled, never both-and-neither
@@ -97,11 +110,13 @@ export type YearMonth  = string;  // 'YYYY-MM'
 export type ISOWeek    = string;  // 'YYYY-Www', ISO week, weeks end Sunday
 
 export type PhoneState = 'clean' | 'slip' | 'lost';
-export type Slot       = '11:00' | '15:00';
-export type CodeChoice = 'coding' | 'cert';
+export type Slot       = '19:00' | '21:00';
 export type Grade      = 'green' | 'amber' | 'red';
 
-export type DoingItemId = 'systemDesign' | 'coding' | 'office';
+/** The three subjects. `cert` is a slot, not a course: whichever certification is
+ *  in flight lives there. */
+export type StudyItemId = 'systemDesign' | 'cert' | 'lld';
+export type DoingItemId = StudyItemId | 'office';
 
 /** Status of one doing item on one day. */
 export type ItemStatus =
@@ -121,10 +136,6 @@ export interface SystemDesignState extends ItemState {
   slot?: Slot;          // present only when status === 'done'
 }
 
-export interface CodingState extends ItemState {
-  choice?: CodeChoice;  // present only when status === 'done'
-}
-
 export interface EnglishState {
   standup: boolean;     // note written out before speaking
   rewrite: boolean;     // one message cut 30% shorter
@@ -132,11 +143,12 @@ export interface EnglishState {
 }
 
 export interface DayEntry {
-  schema: 1;
+  schema: 2;
   date: ISODate;
   phone: PhoneState | null;         // null = not answered
-  systemDesign: SystemDesignState;
-  coding: CodingState;
+  systemDesign: SystemDesignState;  // every item is present on every entry;
+  cert: ItemState;                  // one the day did not ask for stays 'pending',
+  lld: ItemState;                   // and is never rendered or graded
   office: ItemState;                // ignored entirely on weekends
   english: EnglishState;
   urges: number | null;             // null = deliberately blank, never zero
@@ -230,8 +242,11 @@ never forget to stamp, and the two exceptions have to be deliberate.
   ninety seconds; a dropped write is worse than a redundant one.
 - `QuotaExceededError` surfaces as a visible, non-dismissable message telling the user to export.
   It is the only storage error the user ever sees.
-- `schema: 1` is stamped on every record. A future migration reads the field and rewrites; there
-  is no migration code today, only the field to hang one on.
+- `schema: 2` is stamped on every record. Schema 1 entries migrate **on read**, in `parseDay`:
+  the old `coding` item splits into `cert` or `lld` by its recorded choice, and the workday slots
+  `11:00` and `15:00` become `19:00` and `21:00`, early staying early so the month view's split
+  keeps its history. Nothing rewrites v1 in place — a day past the edit window is never saved
+  again, so the migration has to be stable across repeated reads rather than run once.
 
 ### Export and import
 
@@ -257,22 +272,26 @@ gradeDay(entry: DayEntry | null): Grade | null
 
 - Returns `null` when there is no entry at all — a blank heatmap cell. Future dates are always
   `null`.
-- **Core four only:** phone, system design, coding or cert, office target. English is never an
-  input.
+- **Only what the day asked for:** phone, the subjects `schedule.ts` put on that date, and the
+  office target on weekdays. English is never an input.
 - A pass is: phone `clean` or `slip`; a doing item with status `done` or `carried`.
 - `carried` counting as a provisional pass is what makes expiry a *retroactive downgrade* rather
   than a no-op. `expired` and `missed` are both failures. `pending` is a failure.
-- Weekdays (Monday to Friday): 4 items. `green` = 4, `amber` = 3, `red` ≤ 2.
+- Weekdays (Monday to Friday): phone, one subject, office target. 3 items. `green` = 3,
+  `amber` = 2, `red` ≤ 1.
 - Weekends (Saturday and Sunday): office target is dropped entirely — not counted, not shown as
-  failed, not rendered. 3 items. `green` = 3, `amber` = 2, `red` ≤ 1.
+  failed, not rendered. Phone and all three subjects. 4 items. `green` = 4, `amber` = 3, `red` ≤ 2.
+- A subject the schedule did not put on a date is **absent, not failed**. It is not rendered, not
+  counted, and not part of that day's denominator. Doing the wrong subject does not discharge the
+  scheduled one — there is no control on screen to record it.
 
 No weights, no partial credit, no fourth grade, no configuration.
 
 Also in `grading.ts`, because they are the same pure-aggregation shape:
 
 ```ts
-itemRates(days)   // per-item completion rate for the month view
-slotSplit(days)   // 11:00 versus 3:00 count for system design
+itemRates(days)   // per-item completion rate, each over the days that item was scheduled
+slotSplit(days)   // 7:00 versus 9:00 count for system design
 englishRate(days) // sub-checks completed / sub-checks applicable
 urgeSeries(days)  // (ISODate, number | null)[] plus a 7-day trailing average that skips nulls
 gradeCounts(days) // green / amber / red totals and % green
@@ -418,8 +437,8 @@ Tailwind v4, configured in CSS (`@import "tailwindcss"` plus `@theme`), not `tai
 - `prefers-reduced-motion` is respected globally — under it, transitions are removed, not shortened.
 - Focus rings are visible and never removed.
 
-The 3:00 PM control is the one place where visual hierarchy is *behaviour*, not taste: 11:00 is a
-full-width primary control; 3:00 is smaller, lower-contrast, secondary, and positioned beneath it.
+The 9:00 control is the one place where visual hierarchy is *behaviour*, not taste: 7:00 is a
+full-width primary control; 9:00 is smaller, lower-contrast, secondary, and positioned beneath it.
 They must never be rendered as a two-up pair of equal buttons, in any viewport, at any breakpoint.
 
 ---
@@ -471,7 +490,7 @@ a suite that only tested pure modules:
   bypassable in four taps;
 - `Settings` handed settlement the app's *focused* day rather than the clock, so importing while a
   future date was selected expired carries that had not lapsed;
-- a locked day rendered `Done at 11:00` for a completed carry that recorded no slot;
+- a locked day rendered `Done at 7:00` for a completed carry that recorded no slot;
 - a successful merge reported itself as a failure when the settlement that followed it was refused.
 
 So: **the wiring is tested, the styling is not.** A component test earns its place when it covers a
@@ -553,5 +572,5 @@ live there too.
 - Never congratulate, never warn, never encourage. No exclamation marks, no emoji, no "Great job",
   no "your streak is at risk". The app reports; it does not coach.
 - The weekly review names the failing item directly: *"Coding was missed 3 days this week."* Not
-  "consider reviewing coding".
+  "consider reviewing LLD".
 - Plain language for errors, and only for errors the user can act on — storage full, import failed.

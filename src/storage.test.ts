@@ -38,8 +38,9 @@ describe('days', () => {
       urges: 3,
       note: 'held it',
     });
-    expect(read?.systemDesign).toEqual({ status: 'done', slot: '11:00' });
-    expect(read?.coding).toEqual({ status: 'done', choice: 'coding' });
+    expect(read?.systemDesign).toEqual({ status: 'done', slot: '19:00' });
+    expect(read?.cert).toEqual({ status: 'done' });
+    expect(read?.lld).toEqual({ status: 'done' });
   });
 
   test('an absent day is null, not an empty entry', () => {
@@ -50,7 +51,7 @@ describe('days', () => {
     saveDay('2026-08-17', entry('2026-08-17'), NOW);
     const read = getDay('2026-08-17');
     expect(read?.updatedAt).toBe(NOW.toISOString());
-    expect(read?.schema).toBe(1);
+    expect(read?.schema).toBe(2);
   });
 
   test('writeDayRaw preserves updatedAt', () => {
@@ -60,9 +61,9 @@ describe('days', () => {
   });
 
   test('a carried item keeps its dueOn through a round trip', () => {
-    const day = entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-08-18' } });
+    const day = entry('2026-08-17', { lld: { status: 'carried', dueOn: '2026-08-18' } });
     saveDay('2026-08-17', day, NOW);
-    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'carried', dueOn: '2026-08-18' });
+    expect(getDay('2026-08-17')?.lld).toEqual({ status: 'carried', dueOn: '2026-08-18' });
   });
 });
 
@@ -103,9 +104,9 @@ describe('defensive reads', () => {
   test('an unknown item status falls back to pending', () => {
     store.setItem(
       'daily:v1:day:2026-08-17',
-      JSON.stringify({ date: '2026-08-17', coding: { status: 'sort-of' } }),
+      JSON.stringify({ date: '2026-08-17', lld: { status: 'sort-of' } }),
     );
-    expect(getDay('2026-08-17')?.coding.status).toBe('pending');
+    expect(getDay('2026-08-17')?.lld.status).toBe('pending');
   });
 
   test('an unknown phone state falls back to unanswered', () => {
@@ -152,9 +153,9 @@ describe('getMonth and getRange', () => {
 
 describe('reviews', () => {
   test('round-trips and stamps updatedAt', () => {
-    saveReview('2026-W34', { week: '2026-W34', change: 'move coding earlier', updatedAt: '' }, NOW);
+    saveReview('2026-W34', { week: '2026-W34', change: 'move LLD earlier', updatedAt: '' }, NOW);
     const read = getReview('2026-W34');
-    expect(read?.change).toBe('move coding earlier');
+    expect(read?.change).toBe('move LLD earlier');
     expect(read?.updatedAt).toBe(NOW.toISOString());
   });
 
@@ -172,11 +173,11 @@ describe('reviews', () => {
 
 describe('meta', () => {
   test('defaults are blank, not undefined', () => {
-    expect(getMeta()).toEqual({ schema: 1, lastSettledOn: null, lastExportAt: null });
+    expect(getMeta()).toEqual({ schema: 2, lastSettledOn: null, lastExportAt: null });
   });
 
   test('round-trips', () => {
-    saveMeta({ schema: 1, lastSettledOn: '2026-08-17', lastExportAt: null });
+    saveMeta({ schema: 2, lastSettledOn: '2026-08-17', lastExportAt: null });
     expect(getMeta().lastSettledOn).toBe('2026-08-17');
   });
 
@@ -197,7 +198,7 @@ describe('export / import round trip', () => {
   test('exports valid JSON with a schema', () => {
     seed();
     const doc = JSON.parse(exportAll(NOW));
-    expect(doc.schema).toBe(1);
+    expect(doc.schema).toBe(2);
     expect(doc.exportedAt).toBe(NOW.toISOString());
     expect(Object.keys(doc.days)).toHaveLength(2);
   });
@@ -234,7 +235,7 @@ describe('import merges rather than clobbers', () => {
 
   function docWith(updatedAt: string, note: string) {
     return JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: { '2026-08-17': { ...entry('2026-08-17', { note }), updatedAt } },
       reviews: {},
@@ -282,7 +283,7 @@ describe('import dry run', () => {
   const newer = '2026-08-20T00:00:00.000Z';
 
   const doc = JSON.stringify({
-    schema: 1,
+    schema: 2,
     exportedAt: NOW.toISOString(),
     days: {
       '2026-08-17': { ...entry('2026-08-17', { note: 'incoming' }), updatedAt: newer },
@@ -335,7 +336,7 @@ describe('import trusts the key, not the record', () => {
   test('a record whose inner date disagrees with its key is filed under the key', () => {
     // Otherwise a hand-edited export overwrites a day the merge never compared.
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: {
         '2026-08-17': { ...entry('2026-01-01', { note: 'lying' }), date: '2026-01-01' },
@@ -352,7 +353,7 @@ describe('import trusts the key, not the record', () => {
   test('a newer local entry survives a record filed under someone else s date', () => {
     writeDayRaw(entry('2026-01-01', { note: 'mine', updatedAt: '2026-08-20T00:00:00.000Z' }));
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: {
         '2026-08-17': {
@@ -370,7 +371,7 @@ describe('import trusts the key, not the record', () => {
 
   test('a key that is not a date is skipped, not written', () => {
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: { 'not-a-date': entry('2026-08-17'), '2026-02-30': entry('2026-08-17') },
       reviews: {},
@@ -383,7 +384,7 @@ describe('import trusts the key, not the record', () => {
 
   test('reports the oldest day it touched, for settlement', () => {
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: { '2026-08-17': entry('2026-08-17'), '2025-03-04': entry('2025-03-04') },
       reviews: {},
@@ -398,7 +399,7 @@ describe('reviews are keyed by their key, not their contents', () => {
     // `weekStart` throws on anything that is not 'YYYY-Www', and the review history
     // renders every stored week — so one bad value crashes the Sunday screen.
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: {},
       reviews: { '2026-W33': { week: 'nonsense', change: 'x', updatedAt: NOW.toISOString() } },
@@ -410,7 +411,7 @@ describe('reviews are keyed by their key, not their contents', () => {
 
   test('a key that is not a week is skipped', () => {
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: {},
       reviews: {
@@ -429,7 +430,7 @@ describe('reviews are keyed by their key, not their contents', () => {
 
   test('a year that really has 53 weeks keeps its last one', () => {
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
       days: {},
       reviews: { '2026-W53': { change: 'real', updatedAt: NOW.toISOString() } },
@@ -457,34 +458,34 @@ describe('dueOn is a date or it is nothing', () => {
     // skips and `itemPasses` counts as a pass, so the day would stay green for ever.
     localStorage.setItem(
       'daily:v1:day:2026-08-17',
-      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried', dueOn: 'tomorrow' } })),
+      JSON.stringify(entry('2026-08-17', { lld: { status: 'carried', dueOn: 'tomorrow' } })),
     );
 
-    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'expired' });
+    expect(getDay('2026-08-17')?.lld).toEqual({ status: 'expired' });
     expect(gradeDay(getDay('2026-08-17'))).not.toBe('green');
   });
 
   test('the same is true when dueOn is missing entirely', () => {
     localStorage.setItem(
       'daily:v1:day:2026-08-17',
-      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried' } })),
+      JSON.stringify(entry('2026-08-17', { lld: { status: 'carried' } })),
     );
 
-    expect(getDay('2026-08-17')?.coding.status).toBe('expired');
+    expect(getDay('2026-08-17')?.lld.status).toBe('expired');
   });
 
   test('a real dueOn survives', () => {
-    writeDayRaw(entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-08-18' } }));
-    expect(getDay('2026-08-17')?.coding.dueOn).toBe('2026-08-18');
+    writeDayRaw(entry('2026-08-17', { lld: { status: 'carried', dueOn: '2026-08-18' } }));
+    expect(getDay('2026-08-17')?.lld.dueOn).toBe('2026-08-18');
   });
 
   test('an impossible date is dropped', () => {
     localStorage.setItem(
       'daily:v1:day:2026-08-17',
-      JSON.stringify(entry('2026-08-17', { coding: { status: 'carried', dueOn: '2026-02-30' } })),
+      JSON.stringify(entry('2026-08-17', { lld: { status: 'carried', dueOn: '2026-02-30' } })),
     );
 
-    expect(getDay('2026-08-17')?.coding.dueOn).toBeUndefined();
+    expect(getDay('2026-08-17')?.lld.dueOn).toBeUndefined();
   });
 
   test('a date with an unreadable status reads as lapsed, not as a free slot', () => {
@@ -496,30 +497,30 @@ describe('dueOn is a date or it is nothing', () => {
       'daily:v1:day:2026-08-17',
       JSON.stringify({
         date: '2026-08-17',
-        coding: { status: 'carried ', dueOn: '2026-08-18' }, // note the trailing space
+        lld: { status: 'carried ', dueOn: '2026-08-18' }, // note the trailing space
       }),
     );
 
-    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'expired' });
+    expect(getDay('2026-08-17')?.lld).toEqual({ status: 'expired' });
   });
 
   test('a pending item has no business holding a due date', () => {
     localStorage.setItem(
       'daily:v1:day:2026-08-17',
-      JSON.stringify(entry('2026-08-17', { coding: { status: 'pending', dueOn: '2026-08-18' } })),
+      JSON.stringify(entry('2026-08-17', { lld: { status: 'pending', dueOn: '2026-08-18' } })),
     );
 
-    expect(getDay('2026-08-17')?.coding.status).toBe('expired');
+    expect(getDay('2026-08-17')?.lld.status).toBe('expired');
   });
 
   test('a done item keeps its shape when dueOn is corrupt', () => {
     // Only `carried` is coerced. A completed carry is already a pass on its merits.
     localStorage.setItem(
       'daily:v1:day:2026-08-17',
-      JSON.stringify(entry('2026-08-17', { coding: { status: 'done', dueOn: 'tomorrow' } })),
+      JSON.stringify(entry('2026-08-17', { lld: { status: 'done', dueOn: 'tomorrow' } })),
     );
 
-    expect(getDay('2026-08-17')?.coding).toEqual({ status: 'done' });
+    expect(getDay('2026-08-17')?.lld).toEqual({ status: 'done' });
   });
 });
 
@@ -529,14 +530,14 @@ describe('meta survives corruption', () => {
     // page on every launch.
     localStorage.setItem(
       'daily:v1:meta',
-      JSON.stringify({ schema: 1, lastSettledOn: 'nonsense', lastExportAt: null }),
+      JSON.stringify({ schema: 2, lastSettledOn: 'nonsense', lastExportAt: null }),
     );
 
     expect(getMeta().lastSettledOn).toBeNull();
   });
 
   test('a real lastSettledOn survives', () => {
-    saveMeta({ schema: 1, lastSettledOn: '2026-08-17', lastExportAt: null });
+    saveMeta({ schema: 2, lastSettledOn: '2026-08-17', lastExportAt: null });
     expect(getMeta().lastSettledOn).toBe('2026-08-17');
   });
 
@@ -545,7 +546,7 @@ describe('meta survives corruption', () => {
     // value would switch the backup reminder off for ever, silently.
     localStorage.setItem(
       'daily:v1:meta',
-      JSON.stringify({ schema: 1, lastSettledOn: null, lastExportAt: 'whenever' }),
+      JSON.stringify({ schema: 2, lastSettledOn: null, lastExportAt: 'whenever' }),
     );
 
     expect(getMeta().lastExportAt).toBeNull();
@@ -585,7 +586,7 @@ describe('import rejects bad input without losing data', () => {
 
   test('a malformed day inside a valid document is skipped, not fatal', () => {
     const doc = JSON.stringify({
-      schema: 1,
+      schema: 2,
       days: { '2026-08-17': 'not an entry', '2026-08-18': entry('2026-08-18') },
       reviews: {},
     });
@@ -599,5 +600,105 @@ describe('quota', () => {
   test('a full device throws StorageFullError rather than failing silently', () => {
     store.failNextWrite = 'quota';
     expect(() => saveDay('2026-08-17', perfect('2026-08-17'), NOW)).toThrow(StorageFullError);
+  });
+});
+
+describe('schema 1 entries migrate on read', () => {
+  /** A schema-1 day exactly as the old app wrote it: one `coding` item carrying a
+   *  choice, and the workday slots on system design. */
+  function v1(date: string, over: Record<string, unknown> = {}) {
+    return JSON.stringify({
+      schema: 1,
+      date,
+      phone: 'clean',
+      systemDesign: { status: 'done', slot: '11:00' },
+      coding: { status: 'done', choice: 'coding' },
+      office: { status: 'done' },
+      english: { standup: true, rewrite: false, drill: false },
+      urges: 4,
+      note: 'held it',
+      updatedAt: '2026-08-13T20:00:00.000Z',
+      ...over,
+    });
+  }
+
+  test("choice 'coding' lands on LLD, because that item always meant LLD", () => {
+    store.setItem('daily:v1:day:2026-08-13', v1('2026-08-13'));
+    const read = getDay('2026-08-13');
+    expect(read?.lld).toEqual({ status: 'done' });
+    expect(read?.cert).toEqual({ status: 'pending' });
+  });
+
+  test("choice 'cert' lands on the certification", () => {
+    store.setItem(
+      'daily:v1:day:2026-08-13',
+      v1('2026-08-13', { coding: { status: 'done', choice: 'cert' } }),
+    );
+    const read = getDay('2026-08-13');
+    expect(read?.cert).toEqual({ status: 'done' });
+    expect(read?.lld).toEqual({ status: 'pending' });
+  });
+
+  test('an unfinished item has no choice to read, so it lands on LLD', () => {
+    store.setItem('daily:v1:day:2026-08-13', v1('2026-08-13', { coding: { status: 'missed' } }));
+    expect(getDay('2026-08-13')?.lld).toEqual({ status: 'missed' });
+  });
+
+  test('a schema-1 carry arrives as a carry, not as a free slot', () => {
+    // If the status were dropped in the split, settlement would never expire it and
+    // its slot in the rolling window would be held for good.
+    store.setItem(
+      'daily:v1:day:2026-08-13',
+      v1('2026-08-13', { coding: { status: 'carried', dueOn: '2026-08-14' } }),
+    );
+    expect(getDay('2026-08-13')?.lld).toEqual({ status: 'carried', dueOn: '2026-08-14' });
+  });
+
+  test('the workday slots become the evening slots, early staying early', () => {
+    store.setItem('daily:v1:day:2026-08-13', v1('2026-08-13'));
+    expect(getDay('2026-08-13')?.systemDesign).toEqual({ status: 'done', slot: '19:00' });
+
+    store.setItem(
+      'daily:v1:day:2026-08-12',
+      v1('2026-08-12', { systemDesign: { status: 'done', slot: '15:00' } }),
+    );
+    expect(getDay('2026-08-12')?.systemDesign).toEqual({ status: 'done', slot: '21:00' });
+  });
+
+  test('everything outside the split survives untouched', () => {
+    store.setItem('daily:v1:day:2026-08-13', v1('2026-08-13'));
+    expect(getDay('2026-08-13')).toMatchObject({
+      schema: 2,
+      phone: 'clean',
+      urges: 4,
+      note: 'held it',
+      english: { standup: true, rewrite: false, drill: false },
+      updatedAt: '2026-08-13T20:00:00.000Z',
+    });
+  });
+
+  test('a schema-1 export imports as schema 2', () => {
+    const doc = JSON.stringify({
+      schema: 1,
+      exportedAt: NOW.toISOString(),
+      days: { '2026-08-13': JSON.parse(v1('2026-08-13')) },
+      reviews: {},
+    });
+    expect(importAll(doc)).toMatchObject({ added: 1, skipped: 0 });
+    expect(getDay('2026-08-13')?.lld.status).toBe('done');
+  });
+
+  test('reading a migrated day twice gives the same answer', () => {
+    // Nothing rewrites v1 in place, so the migration runs on every read and has to
+    // be stable — a day past the edit window is never saved again.
+    store.setItem('daily:v1:day:2026-08-13', v1('2026-08-13'));
+    expect(getDay('2026-08-13')).toEqual(getDay('2026-08-13'));
+  });
+
+  test('a migrated Thursday still grades on what Thursday asks for', () => {
+    // 2026-08-13 is a Thursday: phone, certification, office target. The v1 day did
+    // LLD, which Thursday never asked for, so the certification is short.
+    store.setItem('daily:v1:day:2026-08-13', v1('2026-08-13'));
+    expect(gradeDay(getDay('2026-08-13'))).toBe('amber');
   });
 });

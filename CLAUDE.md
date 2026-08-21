@@ -9,7 +9,7 @@ does not repeat them.
 | Read | For |
 |---|---|
 | [`SPEC.md`](SPEC.md) | What to build. **Authority on behaviour** — where anything disagrees with it, SPEC.md wins. |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | How it fits together, and how to write it. Authority on structure. §1 resolves all eight of SPEC.md's open questions; §11 is the coding conventions. |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | How it fits together, and how to write it. Authority on structure. §1 resolves all eight of SPEC.md's open questions and records the later decisions that override SPEC.md; §11 is the coding conventions. |
 | [`IMPLEMENTATION_PHASES.md`](IMPLEMENTATION_PHASES.md) | What to build next, and when the current phase is actually done. |
 | [`DEPLOYMENT.md`](DEPLOYMENT.md) | Anything touching `base`, the manifest, or the workflow. |
 
@@ -27,8 +27,9 @@ wiring. Treat that file as the record of what each part has to keep doing, not a
 This app exists to answer one question: *did I hold the line today, and which thing is breaking?*
 
 Every rule that looks arbitrary is load-bearing, because **the user is the failure mode**.
-`Slip caught` counting as a pass, 3:00 PM being visually subordinate to 11:00 AM, carry expiry
-being undismissable, the 7-day edit lock — these are not UX preferences. They are the product.
+`Slip caught` counting as a pass, 9:00 being visually subordinate to 7:00, the schedule being
+fixed in source, carry expiry being undismissable, the 7-day edit lock — these are not UX
+preferences. They are the product.
 
 So: do not soften, generalise, or make them configurable, and do not "improve" them by adding
 options. **If a rule seems wrong, say so and stop. Do not quietly reinterpret it.**
@@ -39,16 +40,23 @@ options. **If a rule seems wrong, say so and stop. Do not quietly reinterpret it
 
 Violating any of these needs explicit approval, asked for in advance and answered.
 
-**Grading** — core four only (phone, system design, coding/cert, office target). Green = all pass,
-amber = 3 of 4, red = ≤2; weekends drop office target (3/3, 2/3, ≤1). `Slip caught` is a pass,
-`Lost` is not. No partial credit, no weights, no other grade states. English **never** affects the
-day's colour.
+**Grading** — only the items the day asked for: phone, the subjects `schedule.ts` puts on that
+date, and the office target on weekdays. Green = all pass, amber = one short, red = two or more
+short. A weekday is 3 items, a weekend 4. `Slip caught` is a pass, `Lost` is not. No partial
+credit, no weights, no other grade states. English **never** affects the day's colour.
 
-**Items** — the list is fixed. No UI for creating, renaming, hiding, or reordering. Phone has three
-states, never a checkbox. System design records *which slot*. Coding/cert records *which one*.
-3:00 PM is never rendered as an equal sibling of 11:00 AM.
+**Items** — the list is fixed: phone, system design, certification, LLD, office target. No UI for
+creating, renaming, hiding, or reordering. Phone has three states, never a checkbox. System design
+records *which slot*; 9:00 is never rendered as an equal sibling of 7:00.
 
-**Carry** — only the three doing items; phone can never be carried. An item cannot be carried
+**Schedule** — fixed in source (`schedule.ts`): certification Mon, Tue, Thu; system design Wed;
+LLD Fri; all three both weekend days. No UI, no per-day override, no swapping today's subject for
+another. A subject the day did not ask for is **absent, not failed** — not rendered, not counted.
+Doing the wrong subject does not discharge the scheduled one. `cert` is a slot, not a course:
+whichever certification is in flight lives there, so the map never moves and history is never
+re-graded.
+
+**Carry** — only the four doing items; phone can never be carried. An item cannot be carried
 twice: **hide** the control, do not disable it. Max two per rolling 7 days, past which the control
 is **disabled** with the exact string
 `Two carries this week already. Do it today or take the miss.`

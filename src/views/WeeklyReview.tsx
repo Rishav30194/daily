@@ -26,8 +26,8 @@ function rangeLabel(from: ISODate, to: ISODate): string {
  * Sunday's screen. It exists to convert a week's pattern into **one concrete
  * change** — not to reflect in general (SPEC.md §7).
  *
- * So the failing item is named outright — *"Coding was missed 3 days this week."* —
- * rather than softened into "consider reviewing coding" (ARCHITECTURE.md §11). A
+ * So the failing item is named outright — *"LLD was missed 3 days this week."* —
+ * rather than softened into "consider reviewing LLD" (ARCHITECTURE.md §11). A
  * diagnosis you have to infer is one you can decline to read.
  *
  * The answer saves on blur, which is what makes the "Today's entry" link safe: a tap

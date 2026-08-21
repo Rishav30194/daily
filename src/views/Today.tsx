@@ -3,16 +3,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { BinaryControl } from '../components/BinaryControl';
 import { CarriedInBanner } from '../components/CarriedInBanner';
 import { CarryControl } from '../components/CarryControl';
-import { ChoiceControl } from '../components/ChoiceControl';
 import { EnglishGroup } from '../components/EnglishGroup';
 import { PhoneControl } from '../components/PhoneControl';
 import { SlotControl } from '../components/SlotControl';
 import { UrgeInput } from '../components/UrgeInput';
 import { CARRY_WINDOW_DAYS, canCarry, carriedInto, carryItem, completeCarried } from '../carry';
 import { addDays, diffDays, isWithinEditWindow, parseISO, todayISO } from '../dates';
-import { appliesOn } from '../grading';
+import { appliesOn, doingItemsOn } from '../grading';
 import { StorageWriteError, getDay, getRange, saveDay } from '../storage';
-import type { DayEntry, DoingItemId, ISODate, ItemState } from '../types';
+import { ITEM_LABELS, type DayEntry, type DoingItemId, type ISODate, type ItemState } from '../types';
 import { LockedDay } from './LockedDay';
 
 interface TodayProps {
@@ -20,13 +19,23 @@ interface TodayProps {
   onOpenMonth: () => void;
 }
 
+/** What the hour is for, one line each. The shape of the session is the point —
+ *  an hour with no shape becomes reading about the subject instead of doing it. */
+const ITEM_NOTES: Record<DoingItemId, string> = {
+  cert: 'one hour — study, then build something with it',
+  systemDesign: 'one hour — one problem, then check it against a reference',
+  lld: 'one hour — one problem, real code',
+  office: 'did you finish what you set out to do',
+};
+
 function blank(date: ISODate): DayEntry {
   return {
-    schema: 1,
+    schema: 2,
     date,
     phone: null,
     systemDesign: { status: 'pending' },
-    coding: { status: 'pending' },
+    cert: { status: 'pending' },
+    lld: { status: 'pending' },
     office: { status: 'pending' },
     english: { standup: false, rewrite: false, drill: false },
     urges: null,
@@ -91,6 +100,14 @@ export function Today({ date, onOpenMonth }: TodayProps) {
 
   function update(patch: Partial<DayEntry>) {
     const next = { ...entry, ...patch };
+    setEntry(next);
+    persist(date, next);
+  }
+
+  /** Spread rather than a computed-key patch, so the result is still a DayEntry to
+   *  the compiler instead of a widened index signature. */
+  function updateItem(item: DoingItemId, state: ItemState) {
+    const next: DayEntry = { ...entry, [item]: state };
     setEntry(next);
     persist(date, next);
   }
@@ -217,33 +234,28 @@ export function Today({ date, onOpenMonth }: TodayProps) {
           <PhoneControl value={entry.phone} onChange={(phone) => update({ phone })} />
         </Section>
 
-        <Section title="System design" note="45 min during the workday">
-          {itemSection(
-            'systemDesign',
-            <SlotControl
-              value={entry.systemDesign}
-              onChange={(systemDesign) => update({ systemDesign })}
-            />,
-          )}
-        </Section>
-
-        <Section title="Coding / certification" note="45 min, one or the other">
-          {itemSection(
-            'coding',
-            <ChoiceControl value={entry.coding} onChange={(coding) => update({ coding })} />,
-          )}
-        </Section>
-
-        {/* Weekends drop the office target entirely — not rendered, not counted,
-            not shown as failed (SPEC.md §5). */}
-        {officeApplies && (
-          <Section title="Office target" note="did you finish what you set out to do">
+        {/* Only what this date asks for: one subject on a weekday, all three at the
+            weekend, and the office target on weekdays only (SPEC.md §5,
+            `schedule.ts`). A subject that is not on today is not rendered and not
+            graded — there is no control on screen to spend the hour on instead. */}
+        {doingItemsOn(date).map((item) => (
+          <Section key={item} title={ITEM_LABELS[item]} note={ITEM_NOTES[item]}>
             {itemSection(
-              'office',
-              <BinaryControl value={entry.office} onChange={(office) => update({ office })} />,
+              item,
+              item === 'systemDesign' ? (
+                <SlotControl
+                  value={entry.systemDesign}
+                  onChange={(systemDesign) => update({ systemDesign })}
+                />
+              ) : (
+                <BinaryControl
+                  value={entry[item]}
+                  onChange={(state) => updateItem(item, state)}
+                />
+              ),
             )}
           </Section>
-        )}
+        ))}
 
         <Section title="Urges">
           <UrgeInput value={entry.urges} onChange={(urges) => update({ urges })} />
@@ -259,7 +271,7 @@ export function Today({ date, onOpenMonth }: TodayProps) {
           />
         </Section>
 
-        {/* Set apart below the core four, and after the note, because it does not
+        {/* Set apart below the graded items, and after the note, because it does not
             count toward the day's colour. */}
         <div className="mt-2 border-t border-line pt-6">
           <EnglishGroup value={entry.english} onChange={(english) => update({ english })} />
