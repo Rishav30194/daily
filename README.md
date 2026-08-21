@@ -21,23 +21,36 @@ for about ninety seconds.
 
 ## What it tracks
 
-**Four core checks** decide the day's colour:
+The day's colour comes from **the checks that day asked for**:
 
 | Item | Recorded as |
 |---|---|
 | Phone | `Clean`, `Slip caught`, or `Lost` — three states, not a checkbox |
-| System design, 45 min | Which slot: **11:00 AM** (default) or 3:00 PM (fallback only) |
-| Coding or Claude cert, 45 min | Which one was done |
-| Office work target | Done or not |
+| System design | Which slot: **7:00 PM** (default) or 9:00 PM (fallback only) |
+| Certification | Done or not |
+| LLD | Done or not |
+| Office work target | Done or not — weekdays only |
 
 `Slip caught` counts as a **pass**. Stopping mid-scroll is the skill being trained; grading it as
 a failure is what turns one slip into a lost day.
 
+**The study hour is scheduled, not chosen.** A weekday holds one hour, so it gets one subject:
+certification on Monday, Tuesday and Thursday, system design on Wednesday, LLD on Friday. Both
+weekend days run all three, an hour each. The map is fixed in source — there is no UI to change
+it, and no way to swap today's subject for an easier one.
+
+A subject the day did not ask for is **absent, not failed**: it isn't shown and doesn't count.
+
+**Certification** is a slot rather than a particular course. Whichever one is in flight lives
+there; passing one and starting the next needs no change to the app. Which certification it is
+belongs in a weekly review note.
+
 **Also tracked, but never affecting the day's colour:** an English group of three sub-checks
 (shown as `2/3`), an optional urge count, and one line of free text.
 
-**The day's grade** — green = all four pass, amber = three, red = two or fewer. Weekends drop the
-office target and grade on three. No partial credit, no weights, no other states.
+**The day's grade** — green = every item the day asked for passes, amber = one short, red = two
+or more short. A weekday is phone, the day's subject and the office target (three items); a
+weekend is phone and all three subjects (four). No partial credit, no weights, no other states.
 
 **Carry-forward** — any of the three doing items can be carried to the next day instead of missed.
 It must be done *that* next day; at the end of day two it expires automatically and is recorded as
@@ -46,7 +59,7 @@ of two carries per rolling seven days. The phone item can never be carried.
 
 **Month view** — a calendar heatmap, grade counts, a completion-rate bar per item (this is the
 diagnostic: it says *which* item is failing, which a day colour can't), an urge-count chart with a
-7-day average, the English rate, and the 11:00 versus 3:00 split. A year overview sits one click
+7-day average, the English rate, and the 7:00 versus 9:00 split. A year overview sits one click
 further out.
 
 **Weekly review** — on Sunday the app opens to the week's grades, names the item with the most

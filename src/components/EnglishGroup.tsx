@@ -15,7 +15,7 @@ const CHECKS: { key: keyof EnglishState; label: string }[] = [
  * Three sub-checks, shown as n/3.
  *
  * Tracked, and given its own completion rate in the month view, but it **never**
- * affects the day's colour (SPEC.md §2.2). It is set apart from the core four in
+ * affects the day's colour (SPEC.md §2.2). It is set apart from the graded items in
  * Today.tsx for exactly that reason — its position on the page is the only thing
  * telling the user it does not count.
  */

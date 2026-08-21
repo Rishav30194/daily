@@ -12,26 +12,28 @@ beforeEach(() => {
   installStorage();
 });
 
-/** A day whose coding item was carried to the day after and never finished. */
+/** A day whose certification item was carried to the day after and never finished.
+ *  Every date used here is one the schedule gives to the certification — the carry
+ *  control only ever appears on an item the day actually asked for. */
 function outstanding(date: string, dueOn: string) {
-  return perfect(date, { coding: { status: 'carried', dueOn } });
+  return perfect(date, { cert: { status: 'carried', dueOn } });
 }
 
 describe('runSettlement', () => {
   test('expires a carry that fell due and downgrades the day', () => {
-    writeDayRaw(outstanding('2026-08-14', '2026-08-15')); // Friday, due Saturday
-    expect(gradeDay(getDay('2026-08-14'))).toBe('green');
+    writeDayRaw(outstanding('2026-08-13', '2026-08-14')); // Thursday, due Friday
+    expect(gradeDay(getDay('2026-08-13'))).toBe('green');
 
     runSettlement(TODAY, NOW);
 
-    expect(getDay('2026-08-14')?.coding.status).toBe('expired');
-    expect(gradeDay(getDay('2026-08-14'))).toBe('amber');
+    expect(getDay('2026-08-13')?.cert.status).toBe('expired');
+    expect(gradeDay(getDay('2026-08-13'))).toBe('amber');
   });
 
   test('leaves a carry that is still due today', () => {
     writeDayRaw(outstanding('2026-08-16', TODAY));
     runSettlement(TODAY, NOW);
-    expect(getDay('2026-08-16')?.coding.status).toBe('carried');
+    expect(getDay('2026-08-16')?.cert.status).toBe('carried');
   });
 
   test('stamps lastSettledOn', () => {
@@ -41,33 +43,33 @@ describe('runSettlement', () => {
 
   test('writes past the 7-day edit lock', () => {
     // The lock guards user edits only; expiry is system-driven (ARCHITECTURE §1 q7).
-    writeDayRaw(outstanding('2026-08-05', '2026-08-06'));
+    writeDayRaw(outstanding('2026-08-06', '2026-08-07'));
     runSettlement(TODAY, NOW);
-    expect(getDay('2026-08-05')?.coding.status).toBe('expired');
+    expect(getDay('2026-08-06')?.cert.status).toBe('expired');
   });
 
   test('does not reach a carry older than the lookback', () => {
     // Documents the limit that `settleFrom` exists to cover after an import.
-    writeDayRaw(outstanding('2026-07-01', '2026-07-02'));
+    writeDayRaw(outstanding('2026-06-30', '2026-07-01'));
     runSettlement(TODAY, NOW);
-    expect(getDay('2026-07-01')?.coding.status).toBe('carried');
+    expect(getDay('2026-06-30')?.cert.status).toBe('carried');
   });
 
   test('is idempotent across repeated opens', () => {
-    writeDayRaw(outstanding('2026-08-14', '2026-08-15'));
+    writeDayRaw(outstanding('2026-08-13', '2026-08-14'));
     expect(runSettlement(TODAY, NOW)).toBe(1);
     expect(runSettlement(TODAY, NOW)).toBe(0);
   });
 });
 
 describe('settleFrom — restored backups', () => {
-  const oldDay = '2026-05-01';
+  const oldDay = '2026-04-30';
 
   function backup() {
     return JSON.stringify({
-      schema: 1,
+      schema: 2,
       exportedAt: NOW.toISOString(),
-      days: { [oldDay]: outstanding(oldDay, '2026-05-02') },
+      days: { [oldDay]: outstanding(oldDay, '2026-05-01') },
       reviews: {},
     });
   }
@@ -76,15 +78,15 @@ describe('settleFrom — restored backups', () => {
     // The bug this covers: lastSettledOn is stamped to today on every open, so the
     // startup pass never looks further back than 14 days and a restored carry would
     // sit as a pass for ever.
-    saveMeta({ schema: 1, lastSettledOn: TODAY, lastExportAt: null });
+    saveMeta({ schema: 2, lastSettledOn: TODAY, lastExportAt: null });
 
     const result = importAll(backup());
-    expect(getDay(oldDay)?.coding.status).toBe('carried');
+    expect(getDay(oldDay)?.cert.status).toBe('carried');
 
     expect(result.oldestDay).toBe(oldDay);
     settleFrom(result.oldestDay!, TODAY, NOW);
 
-    expect(getDay(oldDay)?.coding.status).toBe('expired');
+    expect(getDay(oldDay)?.cert.status).toBe('expired');
     expect(gradeDay(getDay(oldDay))).toBe('amber');
   });
 
@@ -105,7 +107,7 @@ describe('settleFrom never settles past the real today', () => {
 
     settleFrom(TODAY, '2026-08-25', NOW);
 
-    expect(getDay(TODAY)?.coding.status).toBe('carried');
+    expect(getDay(TODAY)?.cert.status).toBe('carried');
   });
 
   test('a future date does not stamp the future into meta', () => {
@@ -118,23 +120,23 @@ describe('settleFrom never settles past the real today', () => {
 
     settleFrom(TODAY, TODAY, NOW);
 
-    expect(getDay(TODAY)?.coding.status).toBe('carried');
+    expect(getDay(TODAY)?.cert.status).toBe('carried');
   });
 
   test('a lapsed carry still expires when the date is clamped', () => {
-    writeDayRaw(outstanding('2026-08-14', '2026-08-15'));
+    writeDayRaw(outstanding('2026-08-13', '2026-08-14'));
 
-    settleFrom('2026-08-14', '2026-08-25', NOW);
+    settleFrom('2026-08-13', '2026-08-25', NOW);
 
-    expect(getDay('2026-08-14')?.coding.status).toBe('expired');
+    expect(getDay('2026-08-13')?.cert.status).toBe('expired');
   });
 
   test('a past date never reaches the days that needed settling', () => {
-    writeDayRaw(outstanding('2026-08-14', '2026-08-15'));
+    writeDayRaw(outstanding('2026-08-13', '2026-08-14'));
 
     settleFrom('2026-08-10', '2026-08-12', NOW);
 
-    expect(getDay('2026-08-14')?.coding.status).toBe('carried');
+    expect(getDay('2026-08-13')?.cert.status).toBe('carried');
   });
 });
 

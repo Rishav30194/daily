@@ -16,6 +16,15 @@ import type { DayEntry, DoingItemId, ISODate } from './types';
 export const CARRY_LIMIT_MESSAGE =
   'Two carries this week already. Do it today or take the miss.';
 
+/**
+ * Every item that can be carried, in the order the schedule runs them.
+ *
+ * One list rather than the same literal in three loops: an item added here without
+ * the others noticing would be a carry that never expires, or one that never counts
+ * against the weekly cap.
+ */
+export const DOING_ITEMS = ['systemDesign', 'cert', 'lld', 'office'] as const;
+
 /** Rolling window, in days, counted inclusive of today. */
 export const CARRY_WINDOW_DAYS = 7;
 
@@ -43,7 +52,7 @@ export function carriesInWindow(window: (DayEntry | null)[], today: ISODate): nu
     const age = diffDays(day.date, today);
     if (age < 0 || age >= CARRY_WINDOW_DAYS) continue;
 
-    for (const item of ['systemDesign', 'coding', 'office'] as const) {
+    for (const item of DOING_ITEMS) {
       const { status } = day[item];
       if (status === 'carried' || status === 'expired') count++;
     }
@@ -116,7 +125,7 @@ export function settle(days: (DayEntry | null)[], today: ISODate, now: Date): Da
     if (!day) continue;
     let next: DayEntry | null = null;
 
-    for (const item of ['systemDesign', 'coding', 'office'] as const) {
+    for (const item of DOING_ITEMS) {
       const state = day[item];
       if (state.status !== 'carried') continue;
       if (state.dueOn === undefined) continue;
@@ -157,7 +166,7 @@ export function carriedInto(previous: DayEntry | null, date: ISODate): CarriedIn
   if (!previous) return [];
 
   const out: CarriedIn[] = [];
-  for (const item of ['systemDesign', 'coding', 'office'] as const) {
+  for (const item of DOING_ITEMS) {
     const state = previous[item];
     if (state.dueOn !== date) continue;
     if (state.status !== 'carried' && state.status !== 'done') continue;

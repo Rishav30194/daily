@@ -24,9 +24,9 @@ const noop = () => {};
 /** A backup holding one very old day whose carry lapsed months ago. */
 function backup(day: string) {
   return JSON.stringify({
-    schema: 1,
+    schema: 2,
     exportedAt: new Date().toISOString(),
-    days: { [day]: perfect(day, { coding: { status: 'carried', dueOn: addDays(day, 1) } }) },
+    days: { [day]: perfect(day, { cert: { status: 'carried', dueOn: addDays(day, 1) } }) },
     reviews: {},
   });
 }
@@ -64,7 +64,7 @@ describe('import', () => {
     await choose(backup(old));
     fireEvent.click(screen.getByRole('button', { name: 'Import' }));
 
-    expect(getDay(old)?.coding.status).toBe('expired');
+    expect(getDay(old)?.cert.status).toBe('expired');
     expect(screen.getByText(/Imported\./)).toBeTruthy();
   });
 
@@ -74,14 +74,14 @@ describe('import', () => {
     // in the future. That expired carries which had not lapsed, and expiry has no
     // undo.
     const today = todayISO();
-    const live = entry(today, { coding: { status: 'carried', dueOn: addDays(today, 1) } });
+    const live = entry(today, { cert: { status: 'carried', dueOn: addDays(today, 1) } });
     writeDayRaw(live);
 
     render(<Settings onBack={noop} />);
     await choose(backup(addDays(today, -120)));
     fireEvent.click(screen.getByRole('button', { name: 'Import' }));
 
-    expect(getDay(today)?.coding.status).toBe('carried');
+    expect(getDay(today)?.cert.status).toBe('carried');
   });
 
   test('a file that is not an export is refused before the confirm step', async () => {

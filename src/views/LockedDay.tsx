@@ -1,4 +1,4 @@
-import { appliesOn } from '../grading';
+import { doingItemsOn } from '../grading';
 import { ITEM_LABELS, type DayEntry, type ItemState, type PhoneState } from '../types';
 
 interface LockedDayProps {
@@ -51,27 +51,19 @@ function Row({ label, value }: { label: string; value: string }) {
  * must — that rule lives in settlement, not here (ARCHITECTURE.md §1, q7).
  */
 export function LockedDay({ entry, reason }: LockedDayProps) {
-  const { office: officeApplies } = appliesOn(entry.date);
   const english = [entry.english.standup, entry.english.rewrite, entry.english.drill].filter(
     Boolean,
   ).length;
 
   // No invented detail. A carry completed from the next day's banner is `done` with
-  // no slot and no choice recorded, and showing "Done at 11:00" for it would put a
-  // slot in the record that was never used — and disagree with the month view, whose
-  // 11:00-vs-3:00 split skips exactly those entries.
+  // no slot recorded, and showing "Done at 7:00" for it would put a slot in the
+  // record that was never used — and disagree with the month view, whose
+  // 7:00-vs-9:00 split skips exactly those entries.
   const slot =
-    entry.systemDesign.slot === '15:00'
-      ? 'Done at 3:00'
-      : entry.systemDesign.slot === '11:00'
-        ? 'Done at 11:00'
-        : 'Done';
-
-  const choice =
-    entry.coding.choice === 'cert'
-      ? 'Certification'
-      : entry.coding.choice === 'coding'
-        ? 'Coding'
+    entry.systemDesign.slot === '21:00'
+      ? 'Done at 9:00'
+      : entry.systemDesign.slot === '19:00'
+        ? 'Done at 7:00'
         : 'Done';
 
   return (
@@ -80,9 +72,16 @@ export function LockedDay({ entry, reason }: LockedDayProps) {
 
       <div>
         <Row label={ITEM_LABELS.phone} value={entry.phone ? PHONE[entry.phone] : '—'} />
-        <Row label={ITEM_LABELS.systemDesign} value={itemValue(entry.systemDesign, slot)} />
-        <Row label={ITEM_LABELS.coding} value={itemValue(entry.coding, choice)} />
-        {officeApplies && <Row label={ITEM_LABELS.office} value={itemValue(entry.office, 'Done')} />}
+        {/* Only the items the day asked for. A subject that was never on this date
+            has nothing to report, and a row reading "Missed" for it would be a
+            record of work that was never owed. */}
+        {doingItemsOn(entry.date).map((item) => (
+          <Row
+            key={item}
+            label={ITEM_LABELS[item]}
+            value={itemValue(entry[item], item === 'systemDesign' ? slot : 'Done')}
+          />
+        ))}
 
         {/* Blank is not zero, so it is written out rather than shown as a dash that
             could be read as a zero (SPEC.md §2.3). */}

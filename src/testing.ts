@@ -4,11 +4,12 @@ import type { DayEntry, ItemStatus, PhoneState } from './types';
  *  fields its rule depends on. */
 export function entry(date: string, over: Partial<DayEntry> = {}): DayEntry {
   return {
-    schema: 1,
+    schema: 2,
     date,
     phone: null,
     systemDesign: { status: 'pending' },
-    coding: { status: 'pending' },
+    cert: { status: 'pending' },
+    lld: { status: 'pending' },
     office: { status: 'pending' },
     english: { standup: false, rewrite: false, drill: false },
     urges: null,
@@ -18,12 +19,19 @@ export function entry(date: string, over: Partial<DayEntry> = {}): DayEntry {
   };
 }
 
-/** A day where every core item passes, for tests that vary one thing. */
+/**
+ * A day where every item passes, for tests that vary one thing.
+ *
+ * Every item, not only the scheduled ones: what a given date asks for is the
+ * schedule's business, and a fixture that had to know the weekday would need
+ * updating every time a test moved to a different day.
+ */
 export function perfect(date: string, over: Partial<DayEntry> = {}): DayEntry {
   return entry(date, {
     phone: 'clean',
-    systemDesign: { status: 'done', slot: '11:00' },
-    coding: { status: 'done', choice: 'coding' },
+    systemDesign: { status: 'done', slot: '19:00' },
+    cert: { status: 'done' },
+    lld: { status: 'done' },
     office: { status: 'done' },
     ...over,
   });

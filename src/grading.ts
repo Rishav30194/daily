@@ -1,4 +1,5 @@
 import { isWeekend } from './dates';
+import { scheduledOn } from './schedule';
 import type {
   DayEntry,
   DoingItemId,
@@ -11,9 +12,10 @@ import type {
 /**
  * Day grading and month aggregation. Pure: no React, no storage, no clock.
  *
- * The day's colour comes from the core four only — phone, system design,
- * coding/cert, office target. English is tracked but never an input here
- * (SPEC.md §2.2), and the urge count never is either.
+ * The day's colour comes from the items the day actually asked for — phone, the
+ * subjects `schedule.ts` put on that date, and the office target on weekdays.
+ * English is tracked but never an input here (SPEC.md §2.2), and the urge count
+ * never is either.
  */
 
 /** A doing item passes when it is done, or still provisionally carried. */
@@ -29,34 +31,49 @@ function phonePasses(entry: DayEntry): boolean {
   return entry.phone === 'clean' || entry.phone === 'slip';
 }
 
-/** Which core items apply on a given date. Weekends drop the office target
- *  entirely — it is not counted and not rendered (SPEC.md §5). */
-export function appliesOn(date: ISODate): { office: boolean; total: number } {
-  const weekend = isWeekend(date);
-  return { office: !weekend, total: weekend ? 3 : 4 };
+/**
+ * The doing items that apply on a date, in display order — the subjects the
+ * schedule put on that day, then the office target.
+ *
+ * A subject the day did not ask for is absent, not failed: Monday holds one hour
+ * and the schedule spends it on the certification, so counting system design as a
+ * Monday miss would make every weekday amber and drain the colour of its meaning.
+ *
+ * Weekends drop the office target entirely — not counted and not rendered
+ * (SPEC.md §5).
+ */
+export function doingItemsOn(date: ISODate): DoingItemId[] {
+  const items: DoingItemId[] = scheduledOn(date);
+  if (!isWeekend(date)) items.push('office');
+  return items;
 }
 
-/** The doing items that apply on a date, in display order. */
-export function doingItemsOn(date: ISODate): DoingItemId[] {
-  return appliesOn(date).office
-    ? ['systemDesign', 'coding', 'office']
-    : ['systemDesign', 'coding'];
+/** Which core items apply on a given date, and how many passes a green needs.
+ *  `total` counts phone, which always applies. */
+export function appliesOn(date: ISODate): {
+  office: boolean;
+  doing: DoingItemId[];
+  total: number;
+} {
+  const doing = doingItemsOn(date);
+  return { office: !isWeekend(date), doing, total: doing.length + 1 };
 }
 
 export function passCount(entry: DayEntry): number {
   let passes = 0;
   if (phonePasses(entry)) passes++;
-  if (itemPasses(entry.systemDesign)) passes++;
-  if (itemPasses(entry.coding)) passes++;
-  if (appliesOn(entry.date).office && itemPasses(entry.office)) passes++;
+  for (const item of doingItemsOn(entry.date)) {
+    if (itemPasses(entry[item])) passes++;
+  }
   return passes;
 }
 
 /**
  * Green = all pass, amber = one short, red = two or more short.
  *
- * Weekdays grade on four items, weekends on three. No partial credit, no weights,
- * no fourth grade state (SPEC.md §3).
+ * A weekday grades on three items — phone, the day's subject, the office target —
+ * and a weekend on four, since all three subjects run and the office target does
+ * not. No partial credit, no weights, no fourth grade state (SPEC.md §3).
  *
  * Returns null when there is no entry — a blank heatmap cell, not a red one.
  */
@@ -106,7 +123,8 @@ export function gradeCounts(days: (DayEntry | null)[]): GradeCounts {
 
 export interface ItemRate {
   item: DoingItemId | 'phone';
-  /** Days the item counted toward the grade. Office excludes weekends. */
+  /** Days the item counted toward the grade. Office excludes weekends, and each
+   *  subject counts only the days the schedule gave it. */
   applicable: number;
   passed: number;
   /** 0–1, or null when the item never applied. */
@@ -116,9 +134,20 @@ export interface ItemRate {
 /**
  * Per-item completion rate — the diagnostic the day colour cannot give. A red day
  * says the day broke; this says which item is breaking (SPEC.md §6).
+ *
+ * Each rate is over the days that item was scheduled, never over the whole month.
+ * The certification runs five days a week and LLD three, so a shared denominator
+ * would show LLD failing whenever it was simply not on the calendar.
  */
 export function itemRates(days: (DayEntry | null)[]): ItemRate[] {
-  const items: (DoingItemId | 'phone')[] = ['phone', 'systemDesign', 'coding', 'office'];
+  // Weekend running order, so the bars read in the order the hours happen.
+  const items: (DoingItemId | 'phone')[] = [
+    'phone',
+    'cert',
+    'systemDesign',
+    'lld',
+    'office',
+  ];
 
   return items.map((item) => {
     let applicable = 0;
@@ -126,7 +155,7 @@ export function itemRates(days: (DayEntry | null)[]): ItemRate[] {
 
     for (const day of days) {
       if (!day) continue;
-      if (item === 'office' && !appliesOn(day.date).office) continue;
+      if (item !== 'phone' && !doingItemsOn(day.date).includes(item)) continue;
 
       applicable++;
       if (item === 'phone' ? phonePasses(day) : itemPasses(day[item])) passed++;
@@ -137,11 +166,11 @@ export function itemRates(days: (DayEntry | null)[]): ItemRate[] {
 }
 
 /**
- * 11:00 versus 3:00 for system design. If 3:00 is winning over a month, 11:00 is
+ * 7:00 versus 9:00 for system design. If 9:00 is winning over a month, 7:00 is
  * not a real slot, and moving it beats defending it (SPEC.md §2.1).
  */
 export function slotSplit(days: (DayEntry | null)[]): Record<Slot, number> {
-  const split: Record<Slot, number> = { '11:00': 0, '15:00': 0 };
+  const split: Record<Slot, number> = { '19:00': 0, '21:00': 0 };
   for (const day of days) {
     if (!day) continue;
     const { slot, status } = day.systemDesign;

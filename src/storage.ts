@@ -3,7 +3,10 @@ import type {
   DayEntry,
   ISODate,
   ISOWeek,
+  ItemState,
+  ItemStatus,
   Meta,
+  Slot,
   WeeklyReview,
   YearMonth,
 } from './types';
@@ -23,7 +26,7 @@ const DAY = `${PREFIX}day:`;
 const REVIEW = `${PREFIX}review:`;
 const META = `${PREFIX}meta`;
 
-const SCHEMA = 1 as const;
+const SCHEMA = 2 as const;
 
 /** A write the device refused. Views catch this base class, so a new reason for a
  *  refusal cannot escape as an unhandled throw out of a click handler. */
@@ -89,7 +92,7 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function itemState(v: unknown): { status: DayEntry['coding']['status']; dueOn?: ISODate } {
+function itemState(v: unknown): { status: ItemStatus; dueOn?: ISODate } {
   const statuses = ['pending', 'done', 'missed', 'carried', 'expired'] as const;
   if (!isObject(v)) return { status: 'pending' };
 
@@ -126,27 +129,64 @@ function itemState(v: unknown): { status: DayEntry['coding']['status']; dueOn?: 
   return dueOn === undefined ? { status } : { status, dueOn };
 }
 
+const SLOTS = ['19:00', '21:00'] as const;
+
+/**
+ * Schema 1 recorded the workday slots, 11:00 and 3:00, before the study hour moved
+ * to the evening. Early maps to early, so the month view's split keeps its history
+ * rather than restarting from an empty chart.
+ */
+const SLOT_V1: Record<string, Slot> = { '11:00': '19:00', '15:00': '21:00' };
+
+function readSlot(v: unknown): Slot | undefined {
+  const raw = isObject(v) ? v['slot'] : undefined;
+  const current = SLOTS.find((s) => s === raw);
+  if (current) return current;
+  return typeof raw === 'string' ? SLOT_V1[raw] : undefined;
+}
+
+/**
+ * Schema 1 held one `coding` item carrying a choice of 'coding' or 'cert'; schema 2
+ * splits it into two items that are scheduled on different days.
+ *
+ * `choice: 'coding'` always meant LLD, so that is where it lands — including when
+ * the choice is missing entirely, which is every day the item was pending, missed
+ * or carried without being finished.
+ *
+ * The item's status travels with it. A v1 carry has to arrive as a carry on exactly
+ * one of the two items, or settlement will never expire it and its slot in the
+ * rolling window is held for good.
+ */
+function migrateCoding(v: Record<string, unknown>): { cert: ItemState; lld: ItemState } {
+  const state = itemState(v['coding']);
+  const raw = isObject(v['coding']) ? v['coding'] : {};
+  const blank: ItemState = { status: 'pending' };
+  return raw['choice'] === 'cert' ? { cert: state, lld: blank } : { cert: blank, lld: state };
+}
+
 /**
  * Parses an unknown value into a DayEntry, or null if it is not one.
  *
  * Missing optional fields are filled with their blank values, but `urges` is only
  * ever a number or null — an absent or non-numeric urge count reads as null (not
  * recorded), never as 0.
+ *
+ * Schema 1 entries are migrated on read. Nothing rewrites them in place: a v1 day
+ * older than the edit window is never saved again, and reading it as v2 every time
+ * costs nothing.
  */
 function parseDay(v: unknown, date: ISODate): DayEntry | null {
   if (!isObject(v)) return null;
 
   const phones = ['clean', 'slip', 'lost'] as const;
-  const slots = ['11:00', '15:00'] as const;
-  const choices = ['coding', 'cert'] as const;
 
   const sd = itemState(v['systemDesign']);
-  const rawSd = isObject(v['systemDesign']) ? v['systemDesign'] : {};
-  const slot = slots.find((s) => s === rawSd['slot']);
+  const slot = readSlot(v['systemDesign']);
 
-  const cd = itemState(v['coding']);
-  const rawCd = isObject(v['coding']) ? v['coding'] : {};
-  const choice = choices.find((c) => c === rawCd['choice']);
+  const split =
+    'cert' in v || 'lld' in v
+      ? { cert: itemState(v['cert']), lld: itemState(v['lld']) }
+      : migrateCoding(v);
 
   const english = isObject(v['english']) ? v['english'] : {};
 
@@ -158,7 +198,8 @@ function parseDay(v: unknown, date: ISODate): DayEntry | null {
     date,
     phone: phones.find((p) => p === v['phone']) ?? null,
     systemDesign: slot === undefined ? sd : { ...sd, slot },
-    coding: choice === undefined ? cd : { ...cd, choice },
+    cert: split.cert,
+    lld: split.lld,
     office: itemState(v['office']),
     english: {
       standup: english['standup'] === true,
